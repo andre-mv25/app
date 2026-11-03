@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "306351776325",
+    "project_id": "robots-495f3",
+    "storage_bucket": "robots-495f3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:306351776325:android:11cd52ea554d55a2fcf92c",
+        "android_client_info": {
+          "package_name": "com.example.robots"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCESFQnaFi8GtmN4mA3rltS7x2S6Mu9Kok"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:306351776325:android:bc8c12961cb34f82fcf92c",
+        "android_client_info": {
+          "package_name": "com.utc.guerrarobots"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCESFQnaFi8GtmN4mA3rltS7x2S6Mu9Kok"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
