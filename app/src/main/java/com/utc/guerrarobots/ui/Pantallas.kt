@@ -101,7 +101,13 @@ fun CategoriasScreen(categorias: List<Categoria>, onElegir: (Categoria) -> Unit,
         Text("¿En qué categoría vas a competir?", style = MaterialTheme.typography.headlineSmall)
         categorias.forEach { c ->
             Card(Modifier.fillMaxWidth().clickable { onElegir(c) }) {
-                Column(Modifier.padding(16.dp)) {
+                Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Image(
+                    //     painter = painterResource(imagenCategoria(c.nombre)),
+                    //     contentDescription = c.nombre,
+                    //     modifier = Modifier.size(120.dp),
+                    // )
+                    // Spacer(Modifier.height(8.dp))
                     Text(c.nombre, style = MaterialTheme.typography.titleMedium)
                     Text(
                         if (c.metodo == Metodo.LLAVES) "Se clasifica por llaves de eliminación directa" else "Se clasifica por mejor tiempo",
@@ -113,6 +119,14 @@ fun CategoriasScreen(categorias: List<Categoria>, onElegir: (Categoria) -> Unit,
         Spacer(Modifier.weight(1f))
         TextButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
     }
+}
+
+private fun imagenCategoria(nombre: String): Int = when (nombre) {
+    "Sigue líneas" -> R.drawable.sigue_lineas
+    "Fútbol robot" -> R.drawable.robos_futbol
+    "Laberinto" -> R.drawable.laberintos
+    "Combate" -> R.drawable.combate_robots
+    else -> R.drawable.robots_velocidad
 }
 
 @Composable
