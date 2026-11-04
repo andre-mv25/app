@@ -3,6 +3,8 @@ package com.utc.guerrarobots.data.memoria
 import com.utc.guerrarobots.domain.model.AceptacionTerminos
 import com.utc.guerrarobots.domain.model.EventoAuditoria
 import com.utc.guerrarobots.domain.model.Terminos
+import com.utc.guerrarobots.domain.model.Rol
+import com.utc.guerrarobots.domain.repository.AutorizacionRepository
 import com.utc.guerrarobots.domain.repository.AuditoriaRepository
 import com.utc.guerrarobots.domain.repository.TerminosRepository
 
@@ -32,4 +34,8 @@ class TerminosMemoria : TerminosRepository {
     }
 
     override suspend fun aceptacionesDe(equipoId: Long): List<AceptacionTerminos> = aceptaciones.filter { it.equipoId == equipoId }
+}
+
+class AutorizacionMemoria(private val roles: Map<String, Rol> = emptyMap()) : AutorizacionRepository {
+    override suspend fun rolDe(correo: String): Rol? = roles[correo]
 }

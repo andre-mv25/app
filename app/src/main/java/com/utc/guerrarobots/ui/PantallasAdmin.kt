@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -43,6 +45,7 @@ import com.utc.guerrarobots.domain.model.Rol
 import com.utc.guerrarobots.domain.service.AccesoService
 import com.utc.guerrarobots.domain.service.AuditoriaService
 import com.utc.guerrarobots.domain.service.RegistroService
+import com.utc.guerrarobots.domain.service.SesionService
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -64,16 +67,58 @@ private fun etiqueta(estado: EstadoEquipo) = when (estado) {
     EstadoEquipo.RECHAZADO -> "Rechazado"
 }
 
-/** Entrada con PIN. La primera vez, el admin crea su PIN. */
+/** Entrada de jurado y admin: con Google (lo normal) o, mientras dure la demo, con PIN. */
 @Composable
-fun AccesoScreen(acceso: AccesoService, onEntro: (Rol) -> Unit, onVolver: () -> Unit) {
+fun AccesoScreen(
+    acceso: AccesoService,
+    sesion: SesionService,
+    inicioSesion: ProveedorInicioSesion,
+    onEntro: (Rol) -> Unit,
+    onVolver: () -> Unit,
+) {
+    val contexto = LocalContext.current
+    val scope = rememberCoroutineScope()
     var rol by remember { mutableStateOf(Rol.ADMIN) }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var errorGoogle by remember { mutableStateOf<String?>(null) }
+    var abriendoGoogle by remember { mutableStateOf(false) }
     val crearAdmin = rol == Rol.ADMIN && !acceso.pinConfigurado(Rol.ADMIN)
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text("Acceso jurado / admin", style = MaterialTheme.typography.headlineSmall)
+
+        Button(
+            enabled = !abriendoGoogle,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                scope.launch {
+                    abriendoGoogle = true
+                    errorGoogle = null
+                    try {
+                        val usuario = inicioSesion.iniciar(contexto)
+                        when (val r = sesion.entrar(usuario)) {
+                            is Resultado.Ok -> onEntro(r.valor)
+                            is Resultado.Falla -> {
+                                errorGoogle = r.primero.mensaje
+                                inicioSesion.cerrar(contexto)
+                            }
+                        }
+                    } catch (e: SesionCancelada) {
+                        // Cerró la ventana de Google: no es un error.
+                    } catch (e: Exception) {
+                        errorGoogle = e.message ?: "No se pudo iniciar sesión"
+                    }
+                    abriendoGoogle = false
+                }
+            },
+        ) { Text(if (abriendoGoogle) "Abriendo Google..." else "Entrar con Google") }
+        errorGoogle?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+        Text("O con PIN (temporal, solo para la demo)", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Opcion("Admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; error = null }
             Opcion("Jurado", rol == Rol.JURADO) { rol = Rol.JURADO; error = null }
@@ -96,7 +141,7 @@ fun AccesoScreen(acceso: AccesoService, onEntro: (Rol) -> Unit, onVolver: () -> 
             },
             modifier = Modifier.fillMaxWidth(),
         )
-        Button(
+        OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = {
                 if (crearAdmin) {
@@ -113,7 +158,7 @@ fun AccesoScreen(acceso: AccesoService, onEntro: (Rol) -> Unit, onVolver: () -> 
                     error = if (acceso.pinConfigurado(rol)) "PIN incorrecto" else "Todavía no hay PIN de jurado: pídele al admin que lo cree"
                 }
             },
-        ) { Text(if (crearAdmin) "Crear PIN y entrar" else "Entrar") }
+        ) { Text(if (crearAdmin) "Crear PIN y entrar" else "Entrar con PIN") }
         TextButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
     }
 }

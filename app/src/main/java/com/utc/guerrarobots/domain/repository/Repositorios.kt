@@ -100,3 +100,9 @@ interface TerminosRepository {
 
     suspend fun aceptacionesDe(equipoId: Long): List<AceptacionTerminos>
 }
+
+/** Quién está autorizado como jurado o admin, por correo. */
+interface AutorizacionRepository {
+    /** El rol de ese correo (ya en minúsculas), o null si no está autorizado. */
+    suspend fun rolDe(correo: String): Rol?
+}

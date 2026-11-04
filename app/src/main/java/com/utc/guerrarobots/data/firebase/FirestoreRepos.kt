@@ -218,6 +218,15 @@ class TerminosFirestore(db: FirebaseFirestore, private val contadores: Contadore
             .mapNotNull { it.mapa()?.let(Mapeo::aAceptacion) }.sortedBy { it.id }
 }
 
+/** Lista de correos autorizados: colección "autorizados", un documento por correo con el campo "rol". */
+class AutorizacionFirestore(db: FirebaseFirestore) : AutorizacionRepository {
+    private val col = db.collection("autorizados")
+
+    override suspend fun rolDe(correo: String): Rol? =
+        (col.document(correo).get().await().data?.get("rol") as? String)
+            ?.let { nombre -> Rol.entries.firstOrNull { it.name == nombre } }
+}
+
 /** PIN en Firestore para que valgan en todos los teléfonos. Solo para la demo: se reemplaza por Google. */
 class PinFirestore(db: FirebaseFirestore, private val scope: CoroutineScope) : PinStore {
     private val doc = db.collection("config").document("pines")

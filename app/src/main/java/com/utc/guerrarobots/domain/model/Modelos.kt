@@ -213,3 +213,10 @@ object TerminosBase {
         "Las decisiones del jurado son definitivas.",
     )
 }
+
+/** Una persona que inició sesión (hoy, con su cuenta de Google). */
+data class Usuario(
+    val uid: String,
+    val correo: String,
+    val nombre: String? = null,
+)

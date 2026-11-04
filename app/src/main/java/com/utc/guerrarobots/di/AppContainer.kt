@@ -7,11 +7,16 @@ import com.utc.guerrarobots.domain.model.ConfigTorneo
 import com.utc.guerrarobots.domain.repository.Reloj
 import com.utc.guerrarobots.domain.rules.Texto
 import com.utc.guerrarobots.domain.service.*
+import com.utc.guerrarobots.ui.ProveedorInicioSesion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
-class AppContainer(db: FirebaseFirestore, config: ConfigTorneo = ConfigTorneo()) {
+class AppContainer(
+    db: FirebaseFirestore,
+    val inicioSesion: ProveedorInicioSesion,
+    config: ConfigTorneo = ConfigTorneo(),
+) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val tx = TransaccionFirestore()
     private val reloj = Reloj { System.currentTimeMillis() }
@@ -25,9 +30,12 @@ class AppContainer(db: FirebaseFirestore, config: ConfigTorneo = ConfigTorneo())
     private val pines = PinFirestore(db, scope)
     private val bitacora = AuditoriaFirestore(db, contadores)
     private val versionesTerminos = TerminosFirestore(db, contadores)
+    private val autorizados = AutorizacionFirestore(db)
 
     val acceso = AccesoService(pines)
-    val auditoria = AuditoriaService(bitacora, reloj) { acceso.rolActual.name }
+    val sesion = SesionService(autorizados, acceso)
+    /** En la bitácora se anota el correo de quien inició sesión con Google; con PIN, su rol. */
+    val auditoria = AuditoriaService(bitacora, reloj) { acceso.usuarioActual?.correo ?: acceso.rolActual.name }
     val terminos = TerminosService(versionesTerminos, reloj, auditoria)
     val registro = RegistroService(equipos, catalogo, partidas, tx, config, auditoria, terminos)
     val llaves = LlavesService(equipos, partidas, sorteos, catalogo, tx, reloj, auditoria)

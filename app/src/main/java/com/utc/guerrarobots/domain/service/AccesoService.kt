@@ -3,6 +3,7 @@ package com.utc.guerrarobots.domain.service
 import com.utc.guerrarobots.domain.model.Codigo
 import com.utc.guerrarobots.domain.model.Resultado
 import com.utc.guerrarobots.domain.model.Rol
+import com.utc.guerrarobots.domain.model.Usuario
 import com.utc.guerrarobots.domain.model.falla
 import com.utc.guerrarobots.domain.repository.PinStore
 import java.security.MessageDigest
@@ -17,6 +18,16 @@ class AccesoService(private val store: PinStore) {
 
     var rolActual: Rol = Rol.PARTICIPANTE
         private set
+
+    /** Quién inició sesión con Google, o null si entró con PIN o es participante. */
+    var usuarioActual: Usuario? = null
+        private set
+
+    /** Abre la sesión de alguien que ya se identificó (por ejemplo con Google) y tiene [rol]. */
+    fun entrarComo(usuario: Usuario, rol: Rol) {
+        usuarioActual = usuario
+        rolActual = rol
+    }
 
     fun pinConfigurado(rol: Rol): Boolean = store.obtenerHash(rol) != null
 
@@ -42,16 +53,19 @@ class AccesoService(private val store: PinStore) {
     /** Entra con el PIN de [rol]. Devuelve false si el PIN no existe o no coincide. */
     fun entrar(rol: Rol, pin: String): Boolean {
         if (rol == Rol.PARTICIPANTE) {
+            usuarioActual = null
             rolActual = Rol.PARTICIPANTE
             return true
         }
         val guardado = store.obtenerHash(rol) ?: return false
         if (!verificar(pin, guardado)) return false
+        usuarioActual = null
         rolActual = rol
         return true
     }
 
     fun salir() {
+        usuarioActual = null
         rolActual = Rol.PARTICIPANTE
     }
 

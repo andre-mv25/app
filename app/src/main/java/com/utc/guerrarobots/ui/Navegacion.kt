@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import com.utc.guerrarobots.di.AppContainer
 import com.utc.guerrarobots.domain.model.Categoria
 import com.utc.guerrarobots.domain.model.Equipo
@@ -64,8 +66,12 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
         categorias = contenedor.catalogo.categorias()
     }
 
+    val contexto = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     fun cerrarSesion() {
         contenedor.acceso.salir()
+        scope.launch { contenedor.inicioSesion.cerrar(contexto) }
         rol = Rol.PARTICIPANTE
         pantalla = Pantalla.Inicio
     }
@@ -112,6 +118,8 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             )
             Pantalla.Acceso -> AccesoScreen(
                 acceso = contenedor.acceso,
+                sesion = contenedor.sesion,
+                inicioSesion = contenedor.inicioSesion,
                 onEntro = { rol = it; pantalla = Pantalla.Panel },
                 onVolver = { pantalla = Pantalla.Inicio },
             )

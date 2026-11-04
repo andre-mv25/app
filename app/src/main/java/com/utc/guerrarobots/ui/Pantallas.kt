@@ -123,7 +123,7 @@ fun CategoriasScreen(categorias: List<Categoria>, onElegir: (Categoria) -> Unit,
 
 private fun imagenCategoria(nombre: String): Int = when (nombre) {
     "Sigue líneas" -> R.drawable.sigue_lineas
-    "Fútbol robot" -> R.drawable.robos_futbol
+    "Fútbol robot" -> R.drawable.robots_futbol
     "Laberinto" -> R.drawable.laberintos
     "Combate" -> R.drawable.combate_robots
     else -> R.drawable.robots_velocidad
