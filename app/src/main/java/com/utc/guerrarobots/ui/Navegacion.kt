@@ -121,6 +121,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                 sesion = contenedor.sesion,
                 inicioSesion = contenedor.inicioSesion,
                 onEntro = { rol = it; pantalla = Pantalla.Panel },
+                onRestablecer = { rol = Rol.ADMIN; pantalla = Pantalla.PinJurado },
                 onVolver = { pantalla = Pantalla.Inicio },
             )
             Pantalla.Panel -> PanelScreen(
@@ -133,7 +134,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                 onSalir = { cerrarSesion() },
             )
             Pantalla.Equipos -> EquiposScreen(contenedor.registro, esAdmin = rol == Rol.ADMIN, onVolver = { pantalla = Pantalla.Panel })
-            Pantalla.PinJurado -> PinJuradoScreen(contenedor.acceso, onVolver = { pantalla = Pantalla.Panel })
+            Pantalla.PinJurado -> PinJuradoScreen(contenedor.acceso, contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
             Pantalla.Auditoria -> AuditoriaScreen(contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
             is Pantalla.Llaves -> LlavesScreen(
                 servicio = contenedor.llaves,

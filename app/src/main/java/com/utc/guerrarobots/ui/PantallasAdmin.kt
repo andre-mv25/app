@@ -69,13 +69,17 @@ private fun etiqueta(estado: EstadoEquipo) = when (estado) {
     EstadoEquipo.RECHAZADO -> "Rechazado"
 }
 
-/** Entrada de jurado y admin: con Google (lo normal) o, mientras dure la demo, con PIN. */
+/**
+ * Entrada de jurado y admin: con Google (lo normal) o con el PIN de acceso, que es el mismo para
+ * los dos. Si se perdió el PIN, el admin lo restablece entrando con Google.
+ */
 @Composable
 fun AccesoScreen(
     acceso: AccesoService,
     sesion: SesionService,
     inicioSesion: ProveedorInicioSesion,
     onEntro: (Rol) -> Unit,
+    onRestablecer: () -> Unit,
     onVolver: () -> Unit,
 ) {
     val contexto = LocalContext.current
@@ -85,7 +89,38 @@ fun AccesoScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var errorGoogle by remember { mutableStateOf<String?>(null) }
     var abriendoGoogle by remember { mutableStateOf(false) }
-    val crearAdmin = rol == Rol.ADMIN && !acceso.pinConfigurado(Rol.ADMIN)
+    val crearPin = !acceso.pinConfigurado()
+
+    /** Abre Google. Con [restablecer], solo deja pasar al admin y lo lleva a definir un PIN nuevo. */
+    fun google(restablecer: Boolean) {
+        scope.launch {
+            abriendoGoogle = true
+            errorGoogle = null
+            try {
+                val usuario = inicioSesion.iniciar(contexto)
+                when (val r = sesion.entrar(usuario)) {
+                    is Resultado.Ok -> when {
+                        restablecer && r.valor != Rol.ADMIN -> {
+                            errorGoogle = "Solo el admin puede restablecer el PIN"
+                            acceso.salir()
+                            inicioSesion.cerrar(contexto)
+                        }
+                        restablecer -> onRestablecer()
+                        else -> onEntro(r.valor)
+                    }
+                    is Resultado.Falla -> {
+                        errorGoogle = r.primero.mensaje
+                        inicioSesion.cerrar(contexto)
+                    }
+                }
+            } catch (e: SesionCancelada) {
+                // Cerró la ventana de Google: no es un error.
+            } catch (e: Exception) {
+                errorGoogle = e.message ?: "No se pudo iniciar sesión"
+            }
+            abriendoGoogle = false
+        }
+    }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -96,42 +131,23 @@ fun AccesoScreen(
         Button(
             enabled = !abriendoGoogle,
             modifier = Modifier.fillMaxWidth(),
-            onClick = {
-                scope.launch {
-                    abriendoGoogle = true
-                    errorGoogle = null
-                    try {
-                        val usuario = inicioSesion.iniciar(contexto)
-                        when (val r = sesion.entrar(usuario)) {
-                            is Resultado.Ok -> onEntro(r.valor)
-                            is Resultado.Falla -> {
-                                errorGoogle = r.primero.mensaje
-                                inicioSesion.cerrar(contexto)
-                            }
-                        }
-                    } catch (e: SesionCancelada) {
-                        // Cerró la ventana de Google: no es un error.
-                    } catch (e: Exception) {
-                        errorGoogle = e.message ?: "No se pudo iniciar sesión"
-                    }
-                    abriendoGoogle = false
-                }
-            },
+            onClick = { google(restablecer = false) },
         ) { Text(if (abriendoGoogle) "Abriendo Google..." else "Entrar con Google") }
         errorGoogle?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-        Text("O con PIN (temporal, solo para la demo)", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Opcion("Admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; error = null }
-            Opcion("Jurado", rol == Rol.JURADO) { rol = Rol.JURADO; error = null }
-        }
-        if (crearAdmin) {
-            Text("Primera vez: crea el PIN del admin (de 4 a 8 dígitos).")
+        Text("O con el PIN de acceso", style = MaterialTheme.typography.labelLarge)
+        if (crearPin) {
+            Text("Todavía no hay PIN. Crea uno (de 4 a 8 dígitos): sirve para admin y jurado.")
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Opcion("Admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; error = null }
+                Opcion("Jurado", rol == Rol.JURADO) { rol = Rol.JURADO; error = null }
+            }
         }
         OutlinedTextField(
             value = pin,
             onValueChange = { pin = it },
-            label = { Text(if (crearAdmin) "Nuevo PIN" else "PIN") },
+            label = { Text(if (crearPin) "Nuevo PIN" else "PIN") },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             singleLine = true,
@@ -146,8 +162,8 @@ fun AccesoScreen(
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = {
-                if (crearAdmin) {
-                    when (val r = acceso.configurarPin(Rol.ADMIN, pin)) {
+                if (crearPin) {
+                    when (val r = acceso.configurarPin(pin)) {
                         is Resultado.Ok -> {
                             acceso.entrar(Rol.ADMIN, pin)
                             onEntro(Rol.ADMIN)
@@ -157,10 +173,19 @@ fun AccesoScreen(
                 } else if (acceso.entrar(rol, pin)) {
                     onEntro(rol)
                 } else {
-                    error = if (acceso.pinConfigurado(rol)) "PIN incorrecto" else "Todavía no hay PIN de jurado: pídele al admin que lo cree"
+                    error = "PIN incorrecto"
                 }
             },
-        ) { Text(if (crearAdmin) "Crear PIN y entrar" else "Entrar con PIN") }
+        ) { Text(if (crearPin) "Crear PIN y entrar como admin" else "Entrar con PIN") }
+
+        if (!crearPin) {
+            Text("¿Perdiste el PIN? El admin puede crear uno nuevo entrando con su cuenta de Google.", style = MaterialTheme.typography.bodySmall)
+            TextButton(
+                enabled = !abriendoGoogle,
+                onClick = { google(restablecer = true) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Restablecer PIN con Google") }
+        }
         TextButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
     }
 }
@@ -179,7 +204,7 @@ fun PanelScreen(
         Text(if (rol == Rol.ADMIN) "Panel del admin" else "Panel del jurado", style = MaterialTheme.typography.headlineSmall)
         if (rol == Rol.ADMIN) {
             Button(onClick = onEquipos, modifier = Modifier.fillMaxWidth()) { Text("Equipos registrados") }
-            OutlinedButton(onClick = onPinJurado, modifier = Modifier.fillMaxWidth()) { Text("PIN del jurado") }
+            OutlinedButton(onClick = onPinJurado, modifier = Modifier.fillMaxWidth()) { Text("PIN de acceso") }
             OutlinedButton(onClick = onAuditoria, modifier = Modifier.fillMaxWidth()) { Text("Bitácora de cambios") }
         }
         categorias.forEach { c ->
@@ -191,14 +216,19 @@ fun PanelScreen(
 }
 
 @Composable
-fun PinJuradoScreen(acceso: AccesoService, onVolver: () -> Unit) {
+fun PinJuradoScreen(acceso: AccesoService, auditoria: AuditoriaService, onVolver: () -> Unit) {
+    val scope = rememberCoroutineScope()
     var pin by remember { mutableStateOf("") }
+    var repetir by remember { mutableStateOf("") }
     var mensaje by remember { mutableStateOf<String?>(null) }
     var esError by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("PIN del jurado", style = MaterialTheme.typography.headlineSmall)
-        Text(if (acceso.pinConfigurado(Rol.JURADO)) "Ya hay un PIN. Guardar uno nuevo lo reemplaza." else "Todavía no hay PIN de jurado.")
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("PIN de acceso", style = MaterialTheme.typography.headlineSmall)
+        Text("Es el mismo para admin y jurado. Guardar uno nuevo reemplaza el anterior.")
         OutlinedTextField(
             value = pin,
             onValueChange = { pin = it },
@@ -208,13 +238,29 @@ fun PinJuradoScreen(acceso: AccesoService, onVolver: () -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        OutlinedTextField(
+            value = repetir,
+            onValueChange = { repetir = it },
+            label = { Text("Repite el PIN") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
         mensaje?.let { Text(it, color = if (esError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary) }
         Button(
             modifier = Modifier.fillMaxWidth(),
             onClick = {
-                when (val r = acceso.configurarPin(Rol.JURADO, pin)) {
-                    is Resultado.Ok -> { mensaje = "PIN del jurado guardado"; esError = false; pin = "" }
-                    is Resultado.Falla -> { mensaje = r.primero.mensaje; esError = true }
+                if (pin != repetir) {
+                    mensaje = "Los dos PIN no coinciden"; esError = true
+                } else {
+                    when (val r = acceso.configurarPin(pin)) {
+                        is Resultado.Ok -> {
+                            mensaje = "PIN guardado"; esError = false; pin = ""; repetir = ""
+                            scope.launch { auditoria.registrar(Acciones.PIN_CAMBIADO, "config", null, "PIN de acceso de admin y jurado") }
+                        }
+                        is Resultado.Falla -> { mensaje = r.primero.mensaje; esError = true }
+                    }
                 }
             },
         ) { Text("Guardar PIN") }
@@ -334,6 +380,7 @@ private fun etiquetaAccion(accion: String): String = when (accion) {
     Acciones.PARTIDA_INICIADA -> "Partida iniciada"
     Acciones.PARTIDA_FINALIZADA -> "Resultado de partida"
     Acciones.EQUIPO_ELIMINADO -> "Registro de equipo eliminado"
+    Acciones.PIN_CAMBIADO -> "PIN de acceso cambiado"
     else -> accion
 }
 

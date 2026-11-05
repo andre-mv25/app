@@ -182,6 +182,7 @@ object Acciones {
     const val PARTIDA_INICIADA = "PARTIDA_INICIADA"
     const val PARTIDA_FINALIZADA = "PARTIDA_FINALIZADA"
     const val EQUIPO_ELIMINADO = "EQUIPO_ELIMINADO"
+    const val PIN_CAMBIADO = "PIN_CAMBIADO"
 }
 
 /** Una versión publicada de los términos y condiciones. Cada cambio es una versión nueva (1, 2, 3...). */

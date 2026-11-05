@@ -29,35 +29,33 @@ class AccesoService(private val store: PinStore) {
         rolActual = rol
     }
 
-    fun pinConfigurado(rol: Rol): Boolean = store.obtenerHash(rol) != null
+    /** Hay un solo PIN, el mismo para admin y jurado. Se guarda con la llave del admin. */
+    fun pinConfigurado(): Boolean = store.obtenerHash(Rol.ADMIN) != null
 
     /**
-     * Define o cambia el PIN de un rol. La primera vez se puede crear el PIN del admin sin
-     * sesión; después solo lo puede cambiar alguien que ya entró como admin.
+     * Define o cambia el PIN de acceso. La primera vez no pide sesión; después solo lo puede cambiar
+     * quien ya entró como admin (con Google o con el PIN). Si se perdió el PIN, el admin entra con
+     * Google y define uno nuevo.
      */
-    fun configurarPin(rol: Rol, pin: String): Resultado<Unit> {
-        if (rol == Rol.PARTICIPANTE) {
-            return falla(Codigo.VALIDACION, "El participante no usa PIN", "rol")
-        }
+    fun configurarPin(pin: String): Resultado<Unit> {
         if (!pin.matches(Regex("\\d{4,8}"))) {
             return falla(Codigo.VALIDACION, "El PIN debe tener de 4 a 8 dígitos", "pin")
         }
-        val primeraVezAdmin = rol == Rol.ADMIN && !pinConfigurado(Rol.ADMIN)
-        if (rolActual != Rol.ADMIN && !primeraVezAdmin) {
-            return falla(Codigo.NO_PERMITIDO, "Solo el admin puede configurar los PIN")
+        if (pinConfigurado() && rolActual != Rol.ADMIN) {
+            return falla(Codigo.NO_PERMITIDO, "Solo el admin puede cambiar el PIN")
         }
-        store.guardarHash(rol, crearHash(pin))
+        store.guardarHash(Rol.ADMIN, crearHash(pin))
         return Resultado.Ok(Unit)
     }
 
-    /** Entra con el PIN de [rol]. Devuelve false si el PIN no existe o no coincide. */
+    /** Entra como [rol] con el PIN de acceso. Devuelve false si el PIN no existe o no coincide. */
     fun entrar(rol: Rol, pin: String): Boolean {
         if (rol == Rol.PARTICIPANTE) {
             usuarioActual = null
             rolActual = Rol.PARTICIPANTE
             return true
         }
-        val guardado = store.obtenerHash(rol) ?: return false
+        val guardado = store.obtenerHash(Rol.ADMIN) ?: return false
         if (!verificar(pin, guardado)) return false
         usuarioActual = null
         rolActual = rol
