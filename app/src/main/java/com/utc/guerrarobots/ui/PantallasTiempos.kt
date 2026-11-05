@@ -425,12 +425,12 @@ private fun TiempoGrande(leer: () -> Long) {
                                         errorLocal = null
                                     }) { Text(if (transcurridoMs == 0L) "Iniciar" else "Seguir") }
                                 } else {
-                                    Button(onClick = {
-                                        val final = (System.nanoTime() - inicioNs) / 1_000_000
-                                        transcurridoMs = final
-                                        corriendo = false
-                                        ponerTiempo(final)
-                                    }) { Text("Detener") }
+                                Button(onClick = {
+                                    val msFinal = (System.nanoTime() - inicioNs) / 1_000_000
+                                    transcurridoMs = msFinal
+                                    corriendo = false
+                                    ponerTiempo(msFinal)
+                                }) { Text("Detener") }
                                 }
                                 OutlinedButton(onClick = {
                                     corriendo = false
@@ -494,6 +494,10 @@ private fun TiempoGrande(leer: () -> Long) {
                             errorLocal = "Detén el cronómetro antes de guardar"
                         } else if (m == null || seg == null || mil == null) {
                             errorLocal = "Escribe solo números en el tiempo"
+                        } else if (resultado == ResultadoIntento.VALIDO && (bruto == null || bruto <= 0)) {
+                            errorLocal = "Captura el tiempo: inicia y detén el cronómetro, o escríbelo"
+                        } else if (resultado == ResultadoIntento.DESCALIFICADO && motivo.isBlank()) {
+                            errorLocal = "Escribe el motivo de la descalificación"
                         } else {
                             errorLocal = null
                             onGuardar(resultado, m, seg, mil, pista, motivo, if (resultado == ResultadoIntento.VALIDO) penalizaciones else 0)
