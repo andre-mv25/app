@@ -4,6 +4,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.utc.guerrarobots.data.firebase.*
 import com.utc.guerrarobots.domain.model.CategoriasBase
 import com.utc.guerrarobots.domain.model.ConfigTorneo
+import com.utc.guerrarobots.domain.model.Rol
 import com.utc.guerrarobots.domain.repository.Reloj
 import com.utc.guerrarobots.domain.rules.Texto
 import com.utc.guerrarobots.domain.service.*
@@ -37,7 +38,11 @@ class AppContainer(
     /** En la bitácora se anota el correo de quien inició sesión con Google; con PIN, su rol. */
     val auditoria = AuditoriaService(bitacora, reloj) { acceso.usuarioActual?.correo ?: acceso.rolActual.name }
     val terminos = TerminosService(versionesTerminos, reloj, auditoria)
-    val registro = RegistroService(equipos, catalogo, partidas, tx, config, auditoria, terminos)
+    val registro = RegistroService(
+        equipos, catalogo, partidas, tx, config, auditoria, terminos,
+        intentos = intentos,
+        esAdmin = { acceso.puede(Rol.ADMIN) },
+    )
     val llaves = LlavesService(equipos, partidas, sorteos, catalogo, tx, reloj, auditoria)
     val tiempos = TiemposService(equipos, intentos, sorteos, catalogo, tx, reloj, config, auditoria)
 
