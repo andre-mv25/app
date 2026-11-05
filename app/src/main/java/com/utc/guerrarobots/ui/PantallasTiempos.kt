@@ -43,6 +43,9 @@ import com.utc.guerrarobots.domain.rules.Tiempo
 import com.utc.guerrarobots.domain.service.TiemposService
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 
 @Composable
 private fun Pestana(texto: String, activa: Boolean, onClick: () -> Unit) {
@@ -101,6 +104,7 @@ fun TiemposScreen(
 
     var dialogo by remember { mutableStateOf<Pair<Equipo, Boolean>?>(null) }
     var errorDialogo by remember { mutableStateOf<String?>(null) }
+    var guardando by remember { mutableStateOf(false) }
 
     val maxIntentos = info.intentosMaximos
     val pistas = info.canchas
@@ -293,177 +297,209 @@ fun TiemposScreen(
             pistas = pistas,
             penalizacionMs = servicio.penalizacionMs,
             error = errorDialogo,
+            guardando = guardando,
             onCancelar = { dialogo = null; errorDialogo = null },
             onGuardar = { resultado, min, seg, mil, pista, motivo, penalizaciones ->
-                scope.launch {
-                    val r = if (esExtra) {
-                        servicio.registrarCarreraExtra(categoria, equipo.id, resultado, min, seg, mil, pista, motivo, penalizaciones)
-                    } else {
-                        servicio.registrarIntento(categoria, equipo.id, resultado, min, seg, mil, pista, motivo, penalizaciones)
-                    }
-                    when (r) {
-                        is Resultado.Ok -> { dialogo = null; errorDialogo = null; mensaje = null; refrescar() }
-                        is Resultado.Falla -> errorDialogo = r.primero.mensaje
+                if (!guardando) {
+                    scope.launch {
+                        guardando = true
+                        errorDialogo = null
+                        try {
+                            // Si el servidor no contesta en 20 s se avisa, en vez de dejar la pantalla congelada.
+                            val r = withTimeout(20_000) {
+                                if (esExtra) {
+                                    servicio.registrarCarreraExtra(categoria, equipo.id, resultado, min, seg, mil, pista, motivo, penalizaciones)
+                                } else {
+                                    servicio.registrarIntento(categoria, equipo.id, resultado, min, seg, mil, pista, motivo, penalizaciones)
+                                }
+                            }
+                            when (r) {
+                                is Resultado.Ok -> { dialogo = null; errorDialogo = null; mensaje = null; refrescar() }
+                                is Resultado.Falla -> errorDialogo = r.primero.mensaje
+                            }
+                        } catch (e: TimeoutCancellationException) {
+                            errorDialogo = "El servidor no respondió. Revisa la conexión. Si el intento ya aparece en la lista, no lo repitas."
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            errorDialogo = "No se pudo guardar: ${e.message ?: "error de conexión"}"
+                        } finally {
+                            guardando = false
+                        }
                     }
                 }
             },
         )
     }
-}
 
-@Composable
-private fun IntentoDialog(
-    categoria: ClaveCategoria,
-    equipo: Equipo,
-    esExtra: Boolean,
-    pistas: Int,
-    penalizacionMs: Long,
-    error: String?,
-    onCancelar: () -> Unit,
-    onGuardar: (ResultadoIntento, Int, Int, Int, Int?, String, Int) -> Unit,
-) {
-    var resultado by remember { mutableStateOf(ResultadoIntento.VALIDO) }
-    var minutos by remember { mutableStateOf("") }
-    var segundos by remember { mutableStateOf("") }
-    var milesimas by remember { mutableStateOf("") }
-    var pista by remember { mutableStateOf<Int?>(null) }
-    var motivo by remember { mutableStateOf("") }
-    var penalizaciones by remember { mutableStateOf(0) }
-    var errorLocal by remember { mutableStateOf<String?>(null) }
-
-    var corriendo by remember { mutableStateOf(false) }
-    var inicioNs by remember { mutableStateOf(0L) }
-    var transcurridoMs by remember { mutableStateOf(0L) }
-
-    // Mientras corre el cronómetro la pantalla no se apaga.
-    val vista = LocalView.current
-    DisposableEffect(corriendo) {
-        vista.keepScreenOn = corriendo
-        onDispose { vista.keepScreenOn = false }
+    /** El tiempo grande del cronómetro. Lo lee aquí adentro para que solo este texto se redibuje en cada tick. */
+    @Composable
+    private fun TiempoGrande(leer: () -> Long) {
+        Text(Tiempo.formatear(leer()), style = MaterialTheme.typography.headlineLarge)
     }
 
-    LaunchedEffect(corriendo) {
-        if (corriendo) {
-            while (true) {
-                transcurridoMs = (System.nanoTime() - inicioNs) / 1_000_000
-                delay(16)
+    @Composable
+    private fun IntentoDialog(
+        categoria: ClaveCategoria,
+        equipo: Equipo,
+        esExtra: Boolean,
+        pistas: Int,
+        penalizacionMs: Long,
+        error: String?,
+        guardando: Boolean,
+        onCancelar: () -> Unit,
+        onGuardar: (ResultadoIntento, Int, Int, Int, Int?, String, Int) -> Unit,
+    ) {
+        var resultado by remember { mutableStateOf(ResultadoIntento.VALIDO) }
+        var minutos by remember { mutableStateOf("") }
+        var segundos by remember { mutableStateOf("") }
+        var milesimas by remember { mutableStateOf("") }
+        var pista by remember { mutableStateOf<Int?>(null) }
+        var motivo by remember { mutableStateOf("") }
+        var penalizaciones by remember { mutableStateOf(0) }
+        var errorLocal by remember { mutableStateOf<String?>(null) }
+
+        // Cronómetro
+        var corriendo by remember { mutableStateOf(false) }
+        var inicioNs by remember { mutableStateOf(0L) }
+        var transcurridoMs by remember { mutableStateOf(0L) }
+
+        // Mientras corre el cronómetro la pantalla no se apaga.
+        val vista = LocalView.current
+        DisposableEffect(corriendo) {
+            vista.keepScreenOn = corriendo
+            onDispose { vista.keepScreenOn = false }
+        }
+
+        LaunchedEffect(corriendo) {
+            if (corriendo) {
+                while (true) {
+                    transcurridoMs = (System.nanoTime() - inicioNs) / 1_000_000
+                    delay(40)
+                }
             }
         }
-    }
 
-    fun ponerTiempo(ms: Long) {
-        minutos = (ms / 60_000).toString()
-        segundos = ((ms / 1_000) % 60).toString()
-        milesimas = (ms % 1_000).toString()
-    }
+        fun ponerTiempo(ms: Long) {
+            minutos = (ms / 60_000).toString()
+            segundos = ((ms / 1_000) % 60).toString()
+            milesimas = (ms % 1_000).toString()
+        }
 
-    fun numero(texto: String): Int? = if (texto.isBlank()) 0 else texto.trim().toIntOrNull()
+        fun numero(texto: String): Int? = if (texto.isBlank()) 0 else texto.trim().toIntOrNull()
 
-    val m = numero(minutos)
-    val seg = numero(segundos)
-    val mil = numero(milesimas)
-    val bruto: Long? = if (m != null && seg != null && mil != null && Tiempo.esValido(m, seg, mil)) {
-        Tiempo.aMilisegundos(m, seg, mil)
-    } else {
-        null
-    }
+        val m = numero(minutos)
+        val seg = numero(segundos)
+        val mil = numero(milesimas)
+        val bruto: Long? = if (m != null && seg != null && mil != null && Tiempo.esValido(m, seg, mil)) {
+            Tiempo.aMilisegundos(m, seg, mil)
+        } else {
+            null
+        }
 
-    AlertDialog(
-        onDismissRequest = onCancelar,
-        title = { Text(if (esExtra) "Carrera extra" else "Capturar intento") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("${equipo.nombre} · ${equipo.robot.nombre}")
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Pestana("Válido", resultado == ResultadoIntento.VALIDO) { resultado = ResultadoIntento.VALIDO }
-                    Pestana("No terminó", resultado == ResultadoIntento.NO_TERMINO) { resultado = ResultadoIntento.NO_TERMINO }
-                    Pestana("Descalificado", resultado == ResultadoIntento.DESCALIFICADO) { resultado = ResultadoIntento.DESCALIFICADO }
-                }
-                when (resultado) {
-                    ResultadoIntento.VALIDO -> {
-                        Text(Tiempo.formatear(transcurridoMs), style = MaterialTheme.typography.headlineLarge)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (!corriendo) {
-                                Button(onClick = {
-                                    inicioNs = System.nanoTime() - transcurridoMs * 1_000_000
-                                    corriendo = true
-                                    errorLocal = null
-                                }) { Text(if (transcurridoMs == 0L) "Iniciar" else "Seguir") }
-                            } else {
-                                Button(onClick = {
-                                    val final = (System.nanoTime() - inicioNs) / 1_000_000
-                                    transcurridoMs = final
+        AlertDialog(
+            onDismissRequest = { if (!guardando) onCancelar() },
+            title = { Text(if (esExtra) "Carrera extra" else "Capturar intento") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${equipo.nombre} · ${equipo.robot.nombre}")
+                    // Los avisos van arriba: abajo, con el teclado abierto, quedaban fuera de la vista.
+                    (errorLocal ?: error)?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleSmall)
+                    }
+                    if (guardando) Text("Guardando...", color = MaterialTheme.colorScheme.primary)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Pestana("Válido", resultado == ResultadoIntento.VALIDO) { resultado = ResultadoIntento.VALIDO }
+                        Pestana("No terminó", resultado == ResultadoIntento.NO_TERMINO) { resultado = ResultadoIntento.NO_TERMINO }
+                        Pestana("Descalificado", resultado == ResultadoIntento.DESCALIFICADO) { resultado = ResultadoIntento.DESCALIFICADO }
+                    }
+                    when (resultado) {
+                        ResultadoIntento.VALIDO -> {
+                            TiempoGrande(leer = { transcurridoMs })
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (!corriendo) {
+                                    Button(onClick = {
+                                        inicioNs = System.nanoTime() - transcurridoMs * 1_000_000
+                                        corriendo = true
+                                        errorLocal = null
+                                    }) { Text(if (transcurridoMs == 0L) "Iniciar" else "Seguir") }
+                                } else {
+                                    Button(onClick = {
+                                        val final = (System.nanoTime() - inicioNs) / 1_000_000
+                                        transcurridoMs = final
+                                        corriendo = false
+                                        ponerTiempo(final)
+                                    }) { Text("Detener") }
+                                }
+                                OutlinedButton(onClick = {
                                     corriendo = false
-                                    ponerTiempo(final)
-                                }) { Text("Detener") }
+                                    transcurridoMs = 0
+                                    minutos = ""
+                                    segundos = ""
+                                    milesimas = ""
+                                }) { Text("Reiniciar") }
                             }
-                            OutlinedButton(onClick = {
-                                corriendo = false
-                                transcurridoMs = 0
-                                minutos = ""
-                                segundos = ""
-                                milesimas = ""
-                            }) { Text("Reiniciar") }
+                            Text("Al detenerlo se llena el tiempo; también puedes escribirlo o corregirlo.", style = MaterialTheme.typography.bodySmall)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = minutos, onValueChange = { minutos = it }, label = { Text("Min") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true, modifier = Modifier.weight(1f),
+                                )
+                                OutlinedTextField(
+                                    value = segundos, onValueChange = { segundos = it }, label = { Text("Seg") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true, modifier = Modifier.weight(1f),
+                                )
+                                OutlinedTextField(
+                                    value = milesimas, onValueChange = { milesimas = it }, label = { Text("Mil") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true, modifier = Modifier.weight(1f),
+                                )
+                            }
+                            Text("Penalizaciones (+${Tiempo.formatear(penalizacionMs)} cada una)", style = MaterialTheme.typography.labelLarge)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                OutlinedButton(onClick = { if (penalizaciones > 0) penalizaciones -= 1 }) { Text("−") }
+                                Text("$penalizaciones", style = MaterialTheme.typography.titleLarge)
+                                OutlinedButton(onClick = { penalizaciones += 1 }) { Text("+") }
+                            }
+                            if (bruto != null && bruto > 0) {
+                                Text(
+                                    "Tiempo efectivo: ${Tiempo.formatear(bruto + penalizaciones * penalizacionMs)}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                         }
-                        Text("Al detenerlo se llena el tiempo; también puedes escribirlo o corregirlo.", style = MaterialTheme.typography.bodySmall)
+                        ResultadoIntento.DESCALIFICADO -> OutlinedTextField(
+                            value = motivo, onValueChange = { motivo = it }, label = { Text("Motivo") },
+                            singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        )
+                        ResultadoIntento.NO_TERMINO -> Text("El intento queda registrado sin tiempo.")
+                    }
+                    if (pistas > 1) {
+                        Text("Pista", style = MaterialTheme.typography.labelLarge)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = minutos, onValueChange = { minutos = it }, label = { Text("Min") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true, modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                value = segundos, onValueChange = { segundos = it }, label = { Text("Seg") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true, modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                value = milesimas, onValueChange = { milesimas = it }, label = { Text("Mil") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true, modifier = Modifier.weight(1f),
-                            )
-                        }
-                        Text("Penalizaciones (+${Tiempo.formatear(penalizacionMs)} cada una)", style = MaterialTheme.typography.labelLarge)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            OutlinedButton(onClick = { if (penalizaciones > 0) penalizaciones -= 1 }) { Text("−") }
-                            Text("$penalizaciones", style = MaterialTheme.typography.titleLarge)
-                            OutlinedButton(onClick = { penalizaciones += 1 }) { Text("+") }
-                        }
-                        if (bruto != null && bruto > 0) {
-                            Text(
-                                "Tiempo efectivo: ${Tiempo.formatear(bruto + penalizaciones * penalizacionMs)}",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
+                            for (n in 1..pistas) Pestana(nombrePista(categoria, n), pista == n) { pista = n }
                         }
                     }
-                    ResultadoIntento.DESCALIFICADO -> OutlinedTextField(
-                        value = motivo, onValueChange = { motivo = it }, label = { Text("Motivo") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth(),
-                    )
-                    ResultadoIntento.NO_TERMINO -> Text("El intento queda registrado sin tiempo.")
                 }
-                if (pistas > 1) {
-                    Text("Pista", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (n in 1..pistas) Pestana(nombrePista(categoria, n), pista == n) { pista = n }
-                    }
-                }
-                (errorLocal ?: error)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                if (corriendo) {
-                    errorLocal = "Detén el cronómetro antes de guardar"
-                } else if (m == null || seg == null || mil == null) {
-                    errorLocal = "Escribe solo números en el tiempo"
-                } else {
-                    errorLocal = null
-                    onGuardar(resultado, m, seg, mil, pista, motivo, if (resultado == ResultadoIntento.VALIDO) penalizaciones else 0)
-                }
-            }) { Text("Guardar") }
-        },
-        dismissButton = { TextButton(onClick = onCancelar) { Text("Cancelar") } },
-    )
-}
+            },
+            confirmButton = {
+                Button(
+                    enabled = !guardando,
+                    onClick = {
+                        if (corriendo) {
+                            errorLocal = "Detén el cronómetro antes de guardar"
+                        } else if (m == null || seg == null || mil == null) {
+                            errorLocal = "Escribe solo números en el tiempo"
+                        } else {
+                            errorLocal = null
+                            onGuardar(resultado, m, seg, mil, pista, motivo, if (resultado == ResultadoIntento.VALIDO) penalizaciones else 0)
+                        }
+                    },
+                ) { Text(if (guardando) "Guardando..." else "Guardar") }
+            },
+            dismissButton = { TextButton(onClick = onCancelar, enabled = !guardando) { Text("Cancelar") } },
+        )
+    }
