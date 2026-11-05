@@ -132,7 +132,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                 onCategoria = { pantalla = if (it.metodo == Metodo.LLAVES) Pantalla.Llaves(it) else Pantalla.Tiempos(it) },
                 onSalir = { cerrarSesion() },
             )
-            Pantalla.Equipos -> EquiposScreen(contenedor.registro, onVolver = { pantalla = Pantalla.Panel })
+            Pantalla.Equipos -> EquiposScreen(contenedor.registro, esAdmin = rol == Rol.ADMIN, onVolver = { pantalla = Pantalla.Panel })
             Pantalla.PinJurado -> PinJuradoScreen(contenedor.acceso, onVolver = { pantalla = Pantalla.Panel })
             Pantalla.Auditoria -> AuditoriaScreen(contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
             is Pantalla.Llaves -> LlavesScreen(

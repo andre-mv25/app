@@ -223,7 +223,7 @@ fun PinJuradoScreen(acceso: AccesoService, onVolver: () -> Unit) {
 
 /** Lista de equipos con filtros y botones para aceptar, rechazar o mandar a revisión. */
 @Composable
-fun EquiposScreen(registro: RegistroService, onVolver: () -> Unit) {
+fun EquiposScreen(registro: RegistroService, esAdmin: Boolean = false, onVolver: () -> Unit) {
     val scope = rememberCoroutineScope()
     var categoria by remember { mutableStateOf<ClaveCategoria?>(null) }
     var estado by remember { mutableStateOf<EstadoEquipo?>(null) }
