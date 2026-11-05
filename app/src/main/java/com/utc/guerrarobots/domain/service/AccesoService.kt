@@ -78,8 +78,8 @@ class AccesoService(private val store: PinStore) {
     private fun verificar(pin: String, guardado: String): Boolean {
         val partes = guardado.split('$')
         if (partes.size != 2) return false
-        val esperado = sha256("${partes[0]}:$pin").toByteArray()
-        return MessageDigest.isEqual(esperado, partes[1].toByteArray())
+        val esperado = sha256("${partes[0]}:$pin")
+        return partes[1].equals(esperado, ignoreCase = true)
     }
 
     private fun sha256(texto: String): String =
