@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -223,7 +224,7 @@ fun PinJuradoScreen(acceso: AccesoService, onVolver: () -> Unit) {
 
 /** Lista de equipos con filtros y botones para aceptar, rechazar o mandar a revisión. */
 @Composable
-fun EquiposScreen(registro: RegistroService, esAdmin: Boolean = false, onVolver: () -> Unit) {
+fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> Unit) {
     val scope = rememberCoroutineScope()
     var categoria by remember { mutableStateOf<ClaveCategoria?>(null) }
     var estado by remember { mutableStateOf<EstadoEquipo?>(null) }
@@ -231,6 +232,7 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean = false, onVolver:
     var lista by remember { mutableStateOf<List<Equipo>>(emptyList()) }
     var categorias by remember { mutableStateOf<List<Categoria>>(emptyList()) }
     var mensaje by remember { mutableStateOf<String?>(null) }
+    var porEliminar by remember { mutableStateOf<Equipo?>(null) }
     val nombres = categorias.associate { it.clave to it.nombre }
 
     LaunchedEffect(Unit) { categorias = registro.categorias() }
@@ -243,6 +245,31 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean = false, onVolver:
                 is Resultado.Falla -> mensaje = r.primero.mensaje
             }
         }
+    }
+
+    porEliminar?.let { equipo ->
+        AlertDialog(
+            onDismissRequest = { porEliminar = null },
+            title = { Text("Eliminar registro") },
+            text = {
+                Text(
+                    "Se eliminará ${equipo.folio} · ${equipo.nombre} (robot ${equipo.robot.nombre}). " +
+                        "No se puede deshacer. Si el equipo ya compitió, mejor recházalo.",
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    porEliminar = null
+                    scope.launch {
+                        when (val r = registro.eliminarEquipo(equipo.id)) {
+                            is Resultado.Ok -> { mensaje = null; version += 1 }
+                            is Resultado.Falla -> mensaje = r.primero.mensaje
+                        }
+                    }
+                }) { Text("Eliminar") }
+            },
+            dismissButton = { TextButton(onClick = { porEliminar = null }) { Text("Cancelar") } },
+        )
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -274,6 +301,11 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean = false, onVolver:
                             if (e.estado != EstadoEquipo.ACEPTADO) Button(onClick = { cambiar(e, EstadoEquipo.ACEPTADO) }) { Text("Aceptar") }
                             if (e.estado != EstadoEquipo.REVISION) OutlinedButton(onClick = { cambiar(e, EstadoEquipo.REVISION) }) { Text("Revisión") }
                             if (e.estado != EstadoEquipo.RECHAZADO) OutlinedButton(onClick = { cambiar(e, EstadoEquipo.RECHAZADO) }) { Text("Rechazar") }
+                            if (esAdmin) {
+                                TextButton(onClick = { porEliminar = e }) {
+                                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
                         }
                     }
                 }
@@ -301,6 +333,7 @@ private fun etiquetaAccion(accion: String): String = when (accion) {
     Acciones.LLAVES_PROGRAMADAS -> "Canchas asignadas"
     Acciones.PARTIDA_INICIADA -> "Partida iniciada"
     Acciones.PARTIDA_FINALIZADA -> "Resultado de partida"
+    Acciones.EQUIPO_ELIMINADO -> "Registro de equipo eliminado"
     else -> accion
 }
 
