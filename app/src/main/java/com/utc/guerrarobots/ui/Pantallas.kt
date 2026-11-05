@@ -19,11 +19,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -184,7 +183,6 @@ fun RegistroScreen(
     var nombreRobot by remember { mutableStateOf("") }
     var pesoTxt by remember { mutableStateOf("") }
     var tamanoTxt by remember { mutableStateOf("") }
-    var menuPlantel by remember { mutableStateOf(false) }
     var errores by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var enviando by remember { mutableStateOf(false) }
 
@@ -199,14 +197,17 @@ fun RegistroScreen(
 
         Campo(jefe, { jefe = it }, "Jefe de carrera", errores["jefeCarrera"])
 
-        Box {
-            OutlinedButton(onClick = { menuPlantel = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(plantel.ifEmpty { "Elige tu plantel" })
-            }
-            DropdownMenu(expanded = menuPlantel, onDismissRequest = { menuPlantel = false }) {
-                planteles.forEach { nombre ->
-                    DropdownMenuItem(text = { Text(nombre) }, onClick = { plantel = nombre; menuPlantel = false })
-                }
+        Text("Plantel", style = MaterialTheme.typography.labelLarge)
+        if (planteles.isEmpty()) {
+            Text("Cargando planteles...", style = MaterialTheme.typography.bodySmall)
+        }
+        planteles.forEach { nombre ->
+            Row(
+                Modifier.fillMaxWidth().clickable { plantel = nombre },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = plantel == nombre, onClick = { plantel = nombre })
+                Text(nombre)
             }
         }
         errores["plantel"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
