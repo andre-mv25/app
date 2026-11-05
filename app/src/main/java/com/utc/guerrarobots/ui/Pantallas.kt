@@ -34,10 +34,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.utc.guerrarobots.domain.model.Categoria
+import com.utc.guerrarobots.domain.model.ClaveCategoria
 import com.utc.guerrarobots.domain.model.Equipo
 import com.utc.guerrarobots.domain.model.EstadoEquipo
 import com.utc.guerrarobots.domain.model.Metodo
@@ -95,38 +97,50 @@ fun TerminosScreen(terminos: Terminos?, onAceptar: (Int) -> Unit, onVolver: () -
     }
 }
 
+/** La imagen de cada categoría, según su clave. Una categoría nueva sin imagen se muestra solo con texto. */
+private fun imagenCategoria(clave: ClaveCategoria): Int? = when (clave) {
+    ClaveCategoria.SIGUE_LINEAS -> R.drawable.sigue_lineas
+    ClaveCategoria.FUTBOL -> R.drawable.robots_futbol
+    ClaveCategoria.LABERINTO -> R.drawable.laberintos
+    ClaveCategoria.COMBATE -> R.drawable.combate_robots
+    ClaveCategoria.VELOCIDAD -> R.drawable.robots_velocidad
+    else -> null
+}
+
 @Composable
 fun CategoriasScreen(categorias: List<Categoria>, onElegir: (Categoria) -> Unit, onVolver: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text("¿En qué categoría vas a competir?", style = MaterialTheme.typography.headlineSmall)
         categorias.forEach { c ->
             Card(Modifier.fillMaxWidth().clickable { onElegir(c) }) {
-                Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Image(
-                    //     painter = painterResource(imagenCategoria(c.nombre)),
-                    //     contentDescription = c.nombre,
-                    //     modifier = Modifier.size(120.dp),
-                    // )
-                    // Spacer(Modifier.height(8.dp))
-                    Text(c.nombre, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        if (c.metodo == Metodo.LLAVES) "Se clasifica por llaves de eliminación directa" else "Se clasifica por mejor tiempo",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                Row(
+                    Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    imagenCategoria(c.clave)?.let { imagen ->
+                        Image(
+                            painter = painterResource(imagen),
+                            contentDescription = c.nombre,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.size(104.dp),
+                        )
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(c.nombre, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (c.metodo == Metodo.LLAVES) "Se clasifica por llaves de eliminación directa" else "Se clasifica por mejor tiempo",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             }
         }
-        Spacer(Modifier.weight(1f))
         TextButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
     }
-}
-
-private fun imagenCategoria(nombre: String): Int = when (nombre) {
-    "Sigue líneas" -> R.drawable.sigue_lineas
-    "Fútbol robot" -> R.drawable.robots_futbol
-    "Laberinto" -> R.drawable.laberintos
-    "Combate" -> R.drawable.combate_robots
-    else -> R.drawable.robots_velocidad
 }
 
 @Composable
