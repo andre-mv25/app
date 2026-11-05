@@ -112,6 +112,10 @@ class EquipoFirestore(db: FirebaseFirestore, private val contadores: Contadores)
     override suspend fun actualizarLogo(id: Long, logoUri: String?) {
         col.document(id.toString()).update("logoUri", logoUri).await()
     }
+
+    override suspend fun eliminar(id: Long) {
+        col.document(id.toString()).delete().await()
+    }
 }
 
 class PartidaFirestore(private val db: FirebaseFirestore, private val contadores: Contadores) : PartidaRepository {

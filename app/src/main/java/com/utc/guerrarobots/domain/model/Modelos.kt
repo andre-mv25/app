@@ -181,6 +181,7 @@ object Acciones {
     const val LLAVES_PROGRAMADAS = "LLAVES_PROGRAMADAS"
     const val PARTIDA_INICIADA = "PARTIDA_INICIADA"
     const val PARTIDA_FINALIZADA = "PARTIDA_FINALIZADA"
+    const val EQUIPO_ELIMINADO = "EQUIPO_ELIMINADO"
 }
 
 /** Una versión publicada de los términos y condiciones. Cada cambio es una versión nueva (1, 2, 3...). */
