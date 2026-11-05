@@ -44,6 +44,7 @@ import com.utc.guerrarobots.domain.model.Metodo
 import com.utc.guerrarobots.domain.model.Resultado
 import com.utc.guerrarobots.domain.model.Terminos
 import com.utc.guerrarobots.domain.service.RegistroService
+import com.utc.guerrarobots.domain.rules.Peso
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
@@ -223,7 +224,7 @@ fun RegistroScreen(
         errores["plantel"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         Campo(nombreRobot, { nombreRobot = it }, "Nombre del robot (máx. 15)", errores["nombreRobot"])
-        Campo(pesoTxt, { pesoTxt = it }, "Peso (gramos)", errores["pesoG"], KeyboardType.Number)
+        Campo(pesoTxt, { pesoTxt = it }, "Peso (kg)", errores["pesoG"], KeyboardType.Decimal)
         Campo(tamanoTxt, { tamanoTxt = it }, "Tamaño: lado más largo (cm)", errores["tamanoCm"], KeyboardType.Decimal)
         Text(
             "Si el peso o el tamaño sale de los límites de la categoría, tu registro pasará a revisión técnica.",
@@ -238,10 +239,10 @@ fun RegistroScreen(
             enabled = !enviando,
             modifier = Modifier.fillMaxWidth(),
             onClick = {
-                val peso = pesoTxt.trim().toIntOrNull()
+                val peso = Peso.kgAGramos(pesoTxt)
                 val tamano = tamanoTxt.trim().replace(',', '.').toDoubleOrNull()
                 val locales = buildMap {
-                    if (peso == null) put("pesoG", "Escribe el peso en gramos (número entero)")
+                    if (peso == null) put("pesoG", "Escribe el peso")
                     if (tamano == null) put("tamanoCm", "Escribe el tamaño en centímetros")
                 }
                 if (peso == null || tamano == null) {

@@ -19,6 +19,7 @@ import com.utc.guerrarobots.domain.repository.Transaccion
 import com.utc.guerrarobots.domain.service.AuditoriaService
 import com.utc.guerrarobots.domain.service.TerminosService
 import com.utc.guerrarobots.domain.rules.Texto
+import com.utc.guerrarobots.domain.rules.Peso
 
 /** Registro de equipos y revisión técnica. */
 class RegistroService(
@@ -208,7 +209,7 @@ class RegistroService(
         catalogo.guardarCategoria(actualizada)
         auditoria?.registrar(
             Acciones.LIMITES_ACTUALIZADOS, "categoria", null,
-            "${actualizada.nombre} · peso ${pesoMinG ?: "-"} a ${pesoMaxG ?: "-"} g · tamaño máx. ${tamanoMaxCm ?: "-"} cm",
+            "${actualizada.nombre} · peso ${pesoMinG?.let { Peso.formatearKg(it) } ?: "-"} a ${pesoMaxG?.let { Peso.formatearKg(it) } ?: "-"} · tamaño máx. ${tamanoMaxCm ?: "-"} cm",
         )
         return Resultado.Ok(actualizada)
     }

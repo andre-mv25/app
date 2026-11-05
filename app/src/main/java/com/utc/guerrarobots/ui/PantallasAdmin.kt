@@ -38,6 +38,7 @@ import com.utc.guerrarobots.domain.model.Categoria
 import com.utc.guerrarobots.domain.model.ClaveCategoria
 import com.utc.guerrarobots.domain.model.Equipo
 import com.utc.guerrarobots.domain.model.EstadoEquipo
+import com.utc.guerrarobots.domain.rules.Peso
 import com.utc.guerrarobots.domain.model.EventoAuditoria
 import com.utc.guerrarobots.domain.model.Resultado
 import com.utc.guerrarobots.domain.model.Metodo
@@ -267,7 +268,7 @@ fun EquiposScreen(registro: RegistroService, onVolver: () -> Unit) {
                         Text("${e.folio} · ${e.nombre}", style = MaterialTheme.typography.titleMedium)
                         Text("Capitán: ${e.capitan} · ${e.plantel}")
                         Text("Robot: ${e.robot.nombre} · ${nombres[e.robot.categoria] ?: e.robot.categoria.valor}")
-                        Text("${e.robot.pesoG} g · ${e.robot.tamanoCm} cm")
+                        Text("${Peso.formatearKg(e.robot.pesoG)} · ${e.robot.tamanoCm} cm")
                         Text("Estado: ${etiqueta(e.estado)}", style = MaterialTheme.typography.labelLarge)
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (e.estado != EstadoEquipo.ACEPTADO) Button(onClick = { cambiar(e, EstadoEquipo.ACEPTADO) }) { Text("Aceptar") }
