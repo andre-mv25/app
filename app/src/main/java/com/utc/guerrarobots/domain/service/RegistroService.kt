@@ -14,6 +14,7 @@ import com.utc.guerrarobots.domain.model.Robot
 import com.utc.guerrarobots.domain.model.falla
 import com.utc.guerrarobots.domain.repository.CatalogoRepository
 import com.utc.guerrarobots.domain.repository.EquipoRepository
+import com.utc.guerrarobots.domain.repository.IntentoRepository
 import com.utc.guerrarobots.domain.repository.PartidaRepository
 import com.utc.guerrarobots.domain.repository.Transaccion
 import com.utc.guerrarobots.domain.service.AuditoriaService
@@ -30,6 +31,10 @@ class RegistroService(
     private val config: ConfigTorneo = ConfigTorneo(),
     private val auditoria: AuditoriaService? = null,
     private val terminos: TerminosService? = null,
+    /** Para saber si un equipo ya tiene intentos capturados antes de eliminarlo. */
+    private val intentos: IntentoRepository? = null,
+    /** Quién puede eliminar registros. La app lo conecta con la sesión; por defecto no restringe. */
+    private val esAdmin: () -> Boolean = { true },
 ) {
 
     /** Lo que captura la pantalla "Datos de registro". */
@@ -164,6 +169,29 @@ class RegistroService(
             "${equipo.folio} ${equipo.nombre}: ${equipo.estado.name} → ${nuevo.name}",
         )
         return Resultado.Ok(equipos.obtener(equipoId)!!)
+    }
+
+    /**
+     * Elimina el registro de un equipo. Solo el admin. No se puede si el equipo ya está en las llaves
+     * o ya tiene intentos capturados: en ese caso conviene rechazarlo, para no perder el historial.
+     */
+    suspend fun eliminarEquipo(equipoId: Long): Resultado<Unit> = tx.ejecutar {
+        if (!esAdmin()) return@ejecutar falla(Codigo.NO_PERMITIDO, "Solo el admin puede eliminar un registro")
+        val equipo = equipos.obtener(equipoId)
+            ?: return@ejecutar falla(Codigo.NO_ENCONTRADO, "No existe el equipo", "equipoId")
+        val categoria = equipo.robot.categoria
+        if (partidas.listar(categoria).any { it.equipoAId == equipoId || it.equipoBId == equipoId }) {
+            return@ejecutar falla(Codigo.CONFLICTO, "El equipo ya está en las llaves y no se puede eliminar")
+        }
+        if (intentos?.listarPorEquipo(categoria, equipoId).orEmpty().isNotEmpty()) {
+            return@ejecutar falla(Codigo.CONFLICTO, "El equipo ya tiene intentos capturados y no se puede eliminar. Mejor recházalo")
+        }
+        equipos.eliminar(equipoId)
+        auditoria?.registrar(
+            Acciones.EQUIPO_ELIMINADO, "equipo", equipoId,
+            "${equipo.folio} ${equipo.nombre} · robot ${equipo.robot.nombre} · ${categoria.valor}",
+        )
+        Resultado.Ok(Unit)
     }
 
     /** Las categorías del torneo, en su orden. */
