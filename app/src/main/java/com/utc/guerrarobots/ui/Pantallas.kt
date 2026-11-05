@@ -22,7 +22,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -183,6 +182,7 @@ fun RegistroScreen(
     var nombreRobot by remember { mutableStateOf("") }
     var pesoTxt by remember { mutableStateOf("") }
     var tamanoTxt by remember { mutableStateOf("") }
+    var menuPlantel by remember { mutableStateOf(false) }
     var errores by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var enviando by remember { mutableStateOf(false) }
 
@@ -197,17 +197,27 @@ fun RegistroScreen(
 
         Campo(jefe, { jefe = it }, "Jefe de carrera", errores["jefeCarrera"])
 
-        Text("Plantel", style = MaterialTheme.typography.labelLarge)
-        if (planteles.isEmpty()) {
-            Text("Cargando planteles...", style = MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick = { menuPlantel = !menuPlantel }, modifier = Modifier.fillMaxWidth()) {
+            Text(plantel.ifEmpty { "Elige tu plantel" })
         }
-        planteles.forEach { nombre ->
-            Row(
-                Modifier.fillMaxWidth().clickable { plantel = nombre },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = plantel == nombre, onClick = { plantel = nombre })
-                Text(nombre)
+        if (menuPlantel) {
+            Card(Modifier.fillMaxWidth()) {
+                Column {
+                    if (planteles.isEmpty()) {
+                        Text("Cargando planteles...", Modifier.padding(16.dp))
+                    }
+                    planteles.forEach { nombre ->
+                        Text(
+                            nombre,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (nombre == plantel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { plantel = nombre; menuPlantel = false }
+                                .padding(16.dp),
+                        )
+                    }
+                }
             }
         }
         errores["plantel"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
