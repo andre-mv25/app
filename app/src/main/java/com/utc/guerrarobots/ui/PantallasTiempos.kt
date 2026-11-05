@@ -331,10 +331,11 @@ fun TiemposScreen(
             },
         )
     }
+}
 
-    /** El tiempo grande del cronómetro. Lo lee aquí adentro para que solo este texto se redibuje en cada tick. */
-    @Composable
-    private fun TiempoGrande(leer: () -> Long) {
+/** El tiempo grande del cronómetro. Lo lee aquí adentro para que solo este texto se redibuje en cada tick. */
+@Composable
+private fun TiempoGrande(leer: () -> Long) {
         Text(Tiempo.formatear(leer()), style = MaterialTheme.typography.headlineLarge)
     }
 
