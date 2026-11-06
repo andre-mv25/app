@@ -51,7 +51,7 @@ import androidx.compose.ui.res.painterResource
 import com.utc.guerrarobots.R
 
 @Composable
-fun InicioScreen(onComenzar: () -> Unit, onAcceso: () -> Unit) {
+fun InicioScreen(onComenzar: () -> Unit, onAcceso: () -> Unit, onConsulta: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -66,6 +66,8 @@ fun InicioScreen(onComenzar: () -> Unit, onAcceso: () -> Unit) {
         Button(onClick = onComenzar, modifier = Modifier.fillMaxWidth()) { Text("Registrar mi equipo") }
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = onAcceso, modifier = Modifier.fillMaxWidth()) { Text("Acceso jurado / admin") }
+        Spacer(Modifier.height(16.dp))
+        OutlinedButton(onClick = onConsulta, modifier = Modifier.fillMaxWidth()) { Text("Consultar mi equipo") }
     }
 }
 
