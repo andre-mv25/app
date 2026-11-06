@@ -25,6 +25,7 @@ sealed interface Pantalla {
     data object Equipos : Pantalla
     data object PinJurado : Pantalla
     data object Auditoria : Pantalla
+    data object Consulta : Pantalla
     data class Tiempos(val categoria: Categoria) : Pantalla
     data class Llaves(val categoria: Categoria) : Pantalla
 }
@@ -39,7 +40,8 @@ fun GuerraRobotsNavegacion(contenedor: AppContainer, modifier: Modifier = Modifi
             contenedor.iniciar()
             listo = true
         } catch (e: Exception) {
-            error = e.message ?: "sin conexión"
+            val lugar = e.stackTrace.take(6).joinToString("\n") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
+            error = (e.message ?: "sin conexión") + "\n" + lugar
         }
     }
     when {
@@ -78,7 +80,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
 
     BackHandler(enabled = pantalla != Pantalla.Inicio) {
         when (pantalla) {
-            Pantalla.Inicio, Pantalla.Terminos, Pantalla.Acceso -> pantalla = Pantalla.Inicio
+            Pantalla.Inicio, Pantalla.Terminos, Pantalla.Acceso, Pantalla.Consulta -> pantalla = Pantalla.Inicio
             Pantalla.Categorias -> pantalla = Pantalla.Terminos
             is Pantalla.Registro -> pantalla = Pantalla.Categorias
             is Pantalla.Listo -> pantalla = Pantalla.Inicio
@@ -92,6 +94,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             Pantalla.Inicio -> InicioScreen(
                 onComenzar = { pantalla = Pantalla.Terminos },
                 onAcceso = { pantalla = Pantalla.Acceso },
+                onConsulta = { pantalla = Pantalla.Consulta },
             )
             Pantalla.Terminos -> TerminosScreen(
                 terminos = terminos,
@@ -136,6 +139,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             Pantalla.Equipos -> EquiposScreen(contenedor.registro, esAdmin = rol == Rol.ADMIN, onVolver = { pantalla = Pantalla.Panel })
             Pantalla.PinJurado -> PinJuradoScreen(contenedor.acceso, contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
             Pantalla.Auditoria -> AuditoriaScreen(contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
+            Pantalla.Consulta -> ConsultaScreen(contenedor.consulta, onVolver = { pantalla = Pantalla.Inicio })
             is Pantalla.Llaves -> LlavesScreen(
                 servicio = contenedor.llaves,
                 info = p.categoria,
