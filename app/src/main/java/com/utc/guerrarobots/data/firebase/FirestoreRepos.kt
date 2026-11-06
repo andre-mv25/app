@@ -28,7 +28,7 @@ class Contadores(private val db: FirebaseFirestore) {
     suspend fun siguiente(nombre: String, bloque: Int = 1): Long = mutex.withLock {
         val r = rangos.getOrPut(nombre) { Rango() }
         if (r.siguiente > r.limite) {
-            val ref = db.collection("contadores").document(nombre)
+            val ref = db.collection("gr_contadores").document(nombre)
             val nuevoLimite = db.runTransaction { t ->
                 val actual = t.get(ref).getLong("valor") ?: 0L
                 t.set(ref, mapOf("valor" to actual + bloque))
@@ -44,9 +44,9 @@ class Contadores(private val db: FirebaseFirestore) {
 private fun DocumentSnapshot.mapa(): Map<String, Any?>? = data
 
 class CatalogoFirestore(db: FirebaseFirestore, private val contadores: Contadores) : CatalogoRepository {
-    private val planteles = db.collection("planteles")
-    private val categorias = db.collection("categorias")
-    private val palabras = db.collection("palabras")
+    private val planteles = db.collection("gr_planteles")
+    private val categorias = db.collection("gr_categorias")
+    private val palabras = db.collection("gr_palabras")
 
     override suspend fun planteles(): List<Plantel> =
         planteles.get().await().documents.mapNotNull { d ->
@@ -77,7 +77,7 @@ class CatalogoFirestore(db: FirebaseFirestore, private val contadores: Contadore
 }
 
 class EquipoFirestore(db: FirebaseFirestore, private val contadores: Contadores) : EquipoRepository {
-    private val col = db.collection("equipos")
+    private val col = db.collection("gr_equipos")
 
     override suspend fun insertar(equipo: Equipo): Long {
         val id = contadores.siguiente("equipos")
@@ -119,7 +119,7 @@ class EquipoFirestore(db: FirebaseFirestore, private val contadores: Contadores)
 }
 
 class PartidaFirestore(private val db: FirebaseFirestore, private val contadores: Contadores) : PartidaRepository {
-    private val col: CollectionReference = db.collection("partidas")
+    private val col: CollectionReference = db.collection("gr_partidas")
 
     override suspend fun insertar(partida: Partida): Long {
         val id = contadores.siguiente("partidas", bloque = 20)
@@ -151,7 +151,7 @@ class PartidaFirestore(private val db: FirebaseFirestore, private val contadores
 }
 
 class SorteoFirestore(db: FirebaseFirestore, private val contadores: Contadores) : SorteoRepository {
-    private val col = db.collection("sorteos")
+    private val col = db.collection("gr_sorteos")
 
     override suspend fun insertar(sorteo: Sorteo): Long {
         val id = contadores.siguiente("sorteos")
@@ -165,7 +165,7 @@ class SorteoFirestore(db: FirebaseFirestore, private val contadores: Contadores)
 }
 
 class IntentoFirestore(db: FirebaseFirestore, private val contadores: Contadores) : IntentoRepository {
-    private val col = db.collection("intentos")
+    private val col = db.collection("gr_intentos")
 
     override suspend fun insertar(intento: Intento): Long {
         val id = contadores.siguiente("intentos")
@@ -186,7 +186,7 @@ class IntentoFirestore(db: FirebaseFirestore, private val contadores: Contadores
 }
 
 class AuditoriaFirestore(db: FirebaseFirestore, private val contadores: Contadores) : AuditoriaRepository {
-    private val col = db.collection("auditoria")
+    private val col = db.collection("gr_auditoria")
 
     override suspend fun insertar(evento: EventoAuditoria): Long {
         val id = contadores.siguiente("auditoria")
@@ -200,8 +200,8 @@ class AuditoriaFirestore(db: FirebaseFirestore, private val contadores: Contador
 }
 
 class TerminosFirestore(db: FirebaseFirestore, private val contadores: Contadores) : TerminosRepository {
-    private val versiones = db.collection("terminos")
-    private val aceptaciones = db.collection("aceptaciones_terminos")
+    private val versiones = db.collection("gr_terminos")
+    private val aceptaciones = db.collection("gr_aceptaciones_terminos")
 
     override suspend fun vigente(): Terminos? =
         versiones.orderBy("version", Query.Direction.DESCENDING).limit(1).get().await().documents
@@ -224,7 +224,7 @@ class TerminosFirestore(db: FirebaseFirestore, private val contadores: Contadore
 
 /** Lista de correos autorizados: colección "autorizados", un documento por correo con el campo "rol". */
 class AutorizacionFirestore(db: FirebaseFirestore) : AutorizacionRepository {
-    private val col = db.collection("autorizados")
+    private val col = db.collection("gr_autorizados")
 
     override suspend fun rolDe(correo: String): Rol? =
         (col.document(correo).get().await().data?.get("rol") as? String)
@@ -233,7 +233,7 @@ class AutorizacionFirestore(db: FirebaseFirestore) : AutorizacionRepository {
 
 /** PIN en Firestore para que valgan en todos los teléfonos. Solo para la demo: se reemplaza por Google. */
 class PinFirestore(db: FirebaseFirestore, private val scope: CoroutineScope) : PinStore {
-    private val doc = db.collection("config").document("pines")
+    private val doc = db.collection("gr_config").document("pines")
     private val cache = mutableMapOf<Rol, String>()
 
     suspend fun cargar() {
