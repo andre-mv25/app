@@ -45,13 +45,21 @@ class AppContainer(
     )
     val llaves = LlavesService(equipos, partidas, sorteos, catalogo, tx, reloj, auditoria)
     val tiempos = TiemposService(equipos, intentos, sorteos, catalogo, tx, reloj, config, auditoria)
+    val consulta = ConsultaService(equipos, catalogo, llaves, tiempos)
 
     /** Se llama una vez al abrir la app, antes de mostrar pantallas. */
     suspend fun iniciar() {
         pines.cargar()
         val guardadas = catalogo.categorias().map { it.clave }.toSet()
         CategoriasBase.porDefecto.filter { it.clave !in guardadas }.forEach { catalogo.guardarCategoria(it) }
-        if (catalogo.planteles().isEmpty()) catalogo.agregarPlantel("Toluca")
+        if (catalogo.planteles().isEmpty()) {
+            listOf(
+                "Aragón", "Atizapán", "Chalco", "Coacalco", "Cuautitlán", "Ecatepec",
+                "Huehuetoca", "Ixtapaluca", "Iztapalapa", "Los Reyes", "Neza",
+                "Observatorio", "Puebla", "Tlalpan", "Tlalnepantla", "Toluca",
+                "Toreo", "Zona Rosa",
+            ).forEach { catalogo.agregarPlantel(it) }
+        }
         if (catalogo.palabrasBloqueadas().isEmpty()) {
             listOf("puto", "puta", "pendejo", "mierda", "verga", "chingar", "cabron", "culero")
                 .forEach { catalogo.agregarPalabraBloqueada(Texto.normalizar(it)) }
