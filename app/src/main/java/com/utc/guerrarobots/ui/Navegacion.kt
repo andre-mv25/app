@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 sealed interface Pantalla {
     data object Inicio : Pantalla
     data object Publico : Pantalla
+    data class PublicoCategoria(val categoria: Categoria) : Pantalla
     data class Terminos(val categoria: Categoria) : Pantalla
     data object Categorias : Pantalla
     data class Registro(val categoria: Categoria) : Pantalla
