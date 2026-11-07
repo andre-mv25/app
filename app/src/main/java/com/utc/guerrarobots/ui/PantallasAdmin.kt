@@ -89,7 +89,7 @@ fun AccesoScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var errorGoogle by remember { mutableStateOf<String?>(null) }
     var abriendoGoogle by remember { mutableStateOf(false) }
-    val crearPin = !acceso.pinConfigurado()
+    val crearPin = !acceso.pinConfigurado(Rol.ADMIN)
 
     /** Abre Google. Con [restablecer], solo deja pasar al admin y lo lleva a definir un PIN nuevo. */
     fun google(restablecer: Boolean) {
@@ -137,7 +137,7 @@ fun AccesoScreen(
 
         Text("O con el PIN de acceso", style = MaterialTheme.typography.labelLarge)
         if (crearPin) {
-            Text("Todavía no hay PIN. Crea uno (de 4 a 8 dígitos): sirve para admin y jurado.")
+            Text("Todavía no hay PIN del admin. Crea el primero (de 4 a 8 dígitos). El PIN del jurado lo define después el admin.")
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Opcion("Admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; error = null }
@@ -163,7 +163,7 @@ fun AccesoScreen(
             modifier = Modifier.fillMaxWidth(),
             onClick = {
                 if (crearPin) {
-                    when (val r = acceso.configurarPin(pin)) {
+                    when (val r = acceso.configurarPin(pin, rol)) {
                         is Resultado.Ok -> {
                             acceso.entrar(Rol.ADMIN, pin)
                             onEntro(Rol.ADMIN)
@@ -173,13 +173,13 @@ fun AccesoScreen(
                 } else if (acceso.entrar(rol, pin)) {
                     onEntro(rol)
                 } else {
-                    error = "PIN incorrecto"
+                    error = if (acceso.pinConfigurado(rol)) "PIN incorrecto" else "El admin todavía no define el PIN del jurado"
                 }
             },
         ) { Text(if (crearPin) "Crear PIN y entrar como admin" else "Entrar con PIN") }
 
         if (!crearPin) {
-            Text("¿Perdiste el PIN? El admin puede crear uno nuevo entrando con su cuenta de Google.", style = MaterialTheme.typography.bodySmall)
+            Text("¿Perdiste un PIN? El admin puede crear uno nuevo, para él o para el jurado, entrando con su cuenta de Google.", style = MaterialTheme.typography.bodySmall)
             TextButton(
                 enabled = !abriendoGoogle,
                 onClick = { google(restablecer = true) },
@@ -215,9 +215,11 @@ fun PanelScreen(
     }
 }
 
+/** Cambiar el PIN del admin o el del jurado (deben ser distintos). Pide repetirlo para evitar errores de dedo. */
 @Composable
 fun PinJuradoScreen(acceso: AccesoService, auditoria: AuditoriaService, onVolver: () -> Unit) {
     val scope = rememberCoroutineScope()
+    var rol by remember { mutableStateOf(Rol.ADMIN) }
     var pin by remember { mutableStateOf("") }
     var repetir by remember { mutableStateOf("") }
     var mensaje by remember { mutableStateOf<String?>(null) }
@@ -228,7 +230,15 @@ fun PinJuradoScreen(acceso: AccesoService, auditoria: AuditoriaService, onVolver
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("PIN de acceso", style = MaterialTheme.typography.headlineSmall)
-        Text("Es el mismo para admin y jurado. Guardar uno nuevo reemplaza el anterior.")
+        Text("El admin y el jurado tienen cada uno su PIN, y deben ser distintos. Guardar uno nuevo reemplaza el anterior.")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Opcion("PIN del admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; mensaje = null }
+            Opcion("PIN del jurado", rol == Rol.JURADO) { rol = Rol.JURADO; mensaje = null }
+        }
+        Text(
+            if (acceso.pinConfigurado(rol)) "Ya tiene PIN." else "Todavía no tiene PIN.",
+            style = MaterialTheme.typography.bodySmall,
+        )
         OutlinedTextField(
             value = pin,
             onValueChange = { pin = it },
@@ -254,10 +264,11 @@ fun PinJuradoScreen(acceso: AccesoService, auditoria: AuditoriaService, onVolver
                 if (pin != repetir) {
                     mensaje = "Los dos PIN no coinciden"; esError = true
                 } else {
-                    when (val r = acceso.configurarPin(pin)) {
+                    when (val r = acceso.configurarPin(pin, rol)) {
                         is Resultado.Ok -> {
-                            mensaje = "PIN guardado"; esError = false; pin = ""; repetir = ""
-                            scope.launch { auditoria.registrar(Acciones.PIN_CAMBIADO, "config", null, "PIN de acceso de admin y jurado") }
+                            val quien = if (rol == Rol.ADMIN) "del admin" else "del jurado"
+                            mensaje = "PIN $quien guardado"; esError = false; pin = ""; repetir = ""
+                            scope.launch { auditoria.registrar(Acciones.PIN_CAMBIADO, "config", null, "PIN de acceso $quien") }
                         }
                         is Resultado.Falla -> { mensaje = r.primero.mensaje; esError = true }
                     }
