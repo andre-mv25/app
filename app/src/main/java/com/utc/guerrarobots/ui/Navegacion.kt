@@ -82,6 +82,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
     BackHandler(enabled = pantalla != Pantalla.Inicio) {
         when (pantalla) {
             Pantalla.Inicio, Pantalla.Categorias, Pantalla.Acceso, Pantalla.Publico -> pantalla = Pantalla.Inicio
+            is Pantalla.PublicoCategoria -> pantalla = Pantalla.Publico
             is Pantalla.Terminos -> pantalla = Pantalla.Categorias
             is Pantalla.Registro -> pantalla = Pantalla.Categorias
             is Pantalla.Listo -> pantalla = Pantalla.Inicio
