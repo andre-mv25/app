@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 
 sealed interface Pantalla {
     data object Inicio : Pantalla
+    data object Publico : Pantalla
     data class Terminos(val categoria: Categoria) : Pantalla
     data object Categorias : Pantalla
     data class Registro(val categoria: Categoria) : Pantalla
@@ -79,7 +80,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
 
     BackHandler(enabled = pantalla != Pantalla.Inicio) {
         when (pantalla) {
-            Pantalla.Inicio, Pantalla.Categorias, Pantalla.Acceso -> pantalla = Pantalla.Inicio
+            Pantalla.Inicio, Pantalla.Categorias, Pantalla.Acceso, Pantalla.Publico -> pantalla = Pantalla.Inicio
             is Pantalla.Terminos -> pantalla = Pantalla.Categorias
             is Pantalla.Registro -> pantalla = Pantalla.Categorias
             is Pantalla.Listo -> pantalla = Pantalla.Inicio
@@ -92,7 +93,13 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
         when (val p = pantalla) {
             Pantalla.Inicio -> InicioScreen(
                 onComenzar = { pantalla = Pantalla.Categorias },
+                onPublico = { pantalla = Pantalla.Publico },
                 onAcceso = { pantalla = Pantalla.Acceso },
+            )
+            Pantalla.Publico -> PublicoScreen(
+                categorias = categorias,
+                onElegir = { pantalla = Pantalla.PublicoCategoria(it) },
+                onVolver = { pantalla = Pantalla.Inicio },
             )
             is Pantalla.Terminos -> TerminosScreen(
                 categoria = p.categoria,
@@ -149,6 +156,13 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                 info = p.categoria,
                 esAdmin = rol == Rol.ADMIN,
                 onVolver = { pantalla = Pantalla.Panel },
+            )
+            is Pantalla.PublicoCategoria -> PublicoCategoriaScreen(
+                categoria = p.categoria,
+                registro = contenedor.registro,
+                tiempos = contenedor.tiempos,
+                llaves = contenedor.llaves,
+                onVolver = { pantalla = Pantalla.Publico },
             )
         }
     }
