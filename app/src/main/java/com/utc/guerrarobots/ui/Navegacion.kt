@@ -108,6 +108,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             is Pantalla.Registro -> RegistroScreen(
                 categoria = p.categoria,
                 planteles = planteles,
+                terminosVersion = versionAceptada,
                 onEnviar = { contenedor.registro.registrar(it.copy(terminosVersion = versionAceptada)) },
                 onListo = { pantalla = Pantalla.Listo(it) },
                 onVolver = { pantalla = Pantalla.Terminos(p.categoria) },
