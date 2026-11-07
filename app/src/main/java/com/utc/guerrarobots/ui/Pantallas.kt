@@ -73,7 +73,8 @@ fun InicioScreen(onComenzar: () -> Unit, onAcceso: () -> Unit) {
 fun TerminosScreen(categoria: Categoria, terminos: Terminos?, onAceptar: (Int) -> Unit, onVolver: () -> Unit) {
     var acepto by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Términos y condiciones — ${categoria.nombre}", style = MaterialTheme.typography.headlineSmall)
+        Text("Términos y condiciones", style = MaterialTheme.typography.headlineSmall)
+        Text(categoria.nombre, style = MaterialTheme.typography.titleMedium)
         if (terminos != null) Text("Versión ${terminos.version}", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(12.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -232,7 +233,7 @@ fun RegistroScreen(
         )
 
         errores["categoria"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        errores["terminos"]?.let { Text(it + ". Vuelve a los términos y acéptalos.", color = MaterialTheme.colorScheme.error) }
+        errores["terminos"]?.let { Text(it + ". Regresa y acepta los términos de la categoría.", color = MaterialTheme.colorScheme.error) }
         errores["general"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         Button(
