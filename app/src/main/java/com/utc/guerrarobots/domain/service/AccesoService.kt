@@ -29,33 +29,42 @@ class AccesoService(private val store: PinStore) {
         rolActual = rol
     }
 
-    /** Hay un solo PIN, el mismo para admin y jurado. Se guarda con la llave del admin. */
-    fun pinConfigurado(): Boolean = store.obtenerHash(Rol.ADMIN) != null
+    /** El admin y el jurado tienen cada uno su PIN. Dice si el de [rol] ya está definido. */
+    fun pinConfigurado(rol: Rol = Rol.ADMIN): Boolean = store.obtenerHash(rol) != null
 
     /**
-     * Define o cambia el PIN de acceso. La primera vez no pide sesión; después solo lo puede cambiar
-     * quien ya entró como admin (con Google o con el PIN). Si se perdió el PIN, el admin entra con
-     * Google y define uno nuevo.
+     * Define o cambia el PIN de [rol] (ADMIN o JURADO). Los dos PIN deben ser distintos. El primer
+     * PIN del admin no pide sesión; todos los demás cambios los hace solo quien ya entró como admin
+     * (con Google o con su PIN). Si se perdió un PIN, el admin entra con Google y define uno nuevo.
      */
-    fun configurarPin(pin: String): Resultado<Unit> {
+    fun configurarPin(pin: String, rol: Rol = Rol.ADMIN): Resultado<Unit> {
+        if (rol != Rol.ADMIN && rol != Rol.JURADO) {
+            return falla(Codigo.VALIDACION, "Ese rol no usa PIN")
+        }
         if (!pin.matches(Regex("\\d{4,8}"))) {
             return falla(Codigo.VALIDACION, "El PIN debe tener de 4 a 8 dígitos", "pin")
         }
-        if (pinConfigurado() && rolActual != Rol.ADMIN) {
-            return falla(Codigo.NO_PERMITIDO, "Solo el admin puede cambiar el PIN")
+        val primerPinDelAdmin = rol == Rol.ADMIN && !pinConfigurado(Rol.ADMIN)
+        if (!primerPinDelAdmin && rolActual != Rol.ADMIN) {
+            return falla(Codigo.NO_PERMITIDO, "Solo el admin puede cambiar los PIN")
         }
-        store.guardarHash(Rol.ADMIN, crearHash(pin))
+        val otro = if (rol == Rol.ADMIN) Rol.JURADO else Rol.ADMIN
+        val hashOtro = store.obtenerHash(otro)
+        if (hashOtro != null && verificar(pin, hashOtro)) {
+            return falla(Codigo.VALIDACION, "El PIN del admin y el del jurado deben ser distintos", "pin")
+        }
+        store.guardarHash(rol, crearHash(pin))
         return Resultado.Ok(Unit)
     }
 
-    /** Entra como [rol] con el PIN de acceso. Devuelve false si el PIN no existe o no coincide. */
+    /** Entra como [rol] con su PIN. Devuelve false si ese rol no tiene PIN o no coincide. */
     fun entrar(rol: Rol, pin: String): Boolean {
         if (rol == Rol.PARTICIPANTE) {
             usuarioActual = null
             rolActual = Rol.PARTICIPANTE
             return true
         }
-        val guardado = store.obtenerHash(Rol.ADMIN) ?: return false
+        val guardado = store.obtenerHash(rol) ?: return false
         if (!verificar(pin, guardado)) return false
         usuarioActual = null
         rolActual = rol
