@@ -6,17 +6,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.launch
 import com.utc.guerrarobots.di.AppContainer
 import com.utc.guerrarobots.domain.model.Categoria
 import com.utc.guerrarobots.domain.model.Equipo
 import com.utc.guerrarobots.domain.model.Metodo
 import com.utc.guerrarobots.domain.model.Rol
-import com.utc.guerrarobots.domain.model.Terminos
+import kotlinx.coroutines.launch
 
 sealed interface Pantalla {
     data object Inicio : Pantalla
-    data object Terminos : Pantalla
+    data class Terminos(val categoria: Categoria) : Pantalla
     data object Categorias : Pantalla
     data class Registro(val categoria: Categoria) : Pantalla
     data class Listo(val equipo: Equipo) : Pantalla
@@ -25,7 +24,6 @@ sealed interface Pantalla {
     data object Equipos : Pantalla
     data object PinJurado : Pantalla
     data object Auditoria : Pantalla
-    data object Consulta : Pantalla
     data class Tiempos(val categoria: Categoria) : Pantalla
     data class Llaves(val categoria: Categoria) : Pantalla
 }
@@ -60,11 +58,12 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
     var terminos by remember { mutableStateOf<com.utc.guerrarobots.domain.model.Terminos?>(null) }
     var versionAceptada by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(pantalla) {
-        if (pantalla == Pantalla.Terminos) terminos = contenedor.terminos.vigente()
-        if (pantalla is Pantalla.Registro) {
-            planteles = contenedor.catalogo.planteles().map { it.nombre }
-            if (planteles.isEmpty()) planteles = listOf("Toluca")
+        val actual = pantalla
+        if (actual is Pantalla.Terminos) {
+            terminos = null
+            terminos = contenedor.terminos.paraCategoria(actual.categoria.clave)
         }
+        planteles = contenedor.catalogo.planteles().map { it.nombre }
         categorias = contenedor.catalogo.categorias()
     }
 
@@ -80,8 +79,8 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
 
     BackHandler(enabled = pantalla != Pantalla.Inicio) {
         when (pantalla) {
-            Pantalla.Inicio, Pantalla.Terminos, Pantalla.Acceso, Pantalla.Consulta -> pantalla = Pantalla.Inicio
-            Pantalla.Categorias -> pantalla = Pantalla.Terminos
+            Pantalla.Inicio, Pantalla.Categorias, Pantalla.Acceso -> pantalla = Pantalla.Inicio
+            is Pantalla.Terminos -> pantalla = Pantalla.Categorias
             is Pantalla.Registro -> pantalla = Pantalla.Categorias
             is Pantalla.Listo -> pantalla = Pantalla.Inicio
             Pantalla.Panel -> cerrarSesion()
@@ -92,27 +91,26 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
     Box(modifier) {
         when (val p = pantalla) {
             Pantalla.Inicio -> InicioScreen(
-                onComenzar = { pantalla = Pantalla.Terminos },
+                onComenzar = { pantalla = Pantalla.Categorias },
                 onAcceso = { pantalla = Pantalla.Acceso },
-                onConsulta = { pantalla = Pantalla.Consulta },
             )
-            Pantalla.Terminos -> TerminosScreen(
+            is Pantalla.Terminos -> TerminosScreen(
+                categoria = p.categoria,
                 terminos = terminos,
-                onAceptar = { versionAceptada = it; pantalla = Pantalla.Categorias },
-                onVolver = { pantalla = Pantalla.Inicio },
+                onAceptar = { versionAceptada = it; pantalla = Pantalla.Registro(p.categoria) },
+                onVolver = { pantalla = Pantalla.Categorias },
             )
             Pantalla.Categorias -> CategoriasScreen(
                 categorias = categorias,
-                onElegir = { pantalla = Pantalla.Registro(it) },
-                onVolver = { pantalla = Pantalla.Terminos },
+                onElegir = { versionAceptada = null; pantalla = Pantalla.Terminos(it) },
+                onVolver = { pantalla = Pantalla.Inicio },
             )
             is Pantalla.Registro -> RegistroScreen(
                 categoria = p.categoria,
-                terminosVersion = versionAceptada,
                 planteles = planteles,
                 onEnviar = { contenedor.registro.registrar(it.copy(terminosVersion = versionAceptada)) },
                 onListo = { pantalla = Pantalla.Listo(it) },
-                onVolver = { pantalla = Pantalla.Categorias },
+                onVolver = { pantalla = Pantalla.Terminos(p.categoria) },
             )
             is Pantalla.Listo -> ListoScreen(
                 p.equipo,
@@ -139,7 +137,6 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             Pantalla.Equipos -> EquiposScreen(contenedor.registro, esAdmin = rol == Rol.ADMIN, onVolver = { pantalla = Pantalla.Panel })
             Pantalla.PinJurado -> PinJuradoScreen(contenedor.acceso, contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
             Pantalla.Auditoria -> AuditoriaScreen(contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
-            Pantalla.Consulta -> ConsultaScreen(contenedor.consulta, onVolver = { pantalla = Pantalla.Inicio })
             is Pantalla.Llaves -> LlavesScreen(
                 servicio = contenedor.llaves,
                 info = p.categoria,

@@ -51,7 +51,7 @@ import androidx.compose.ui.res.painterResource
 import com.utc.guerrarobots.R
 
 @Composable
-fun InicioScreen(onComenzar: () -> Unit, onAcceso: () -> Unit, onConsulta: () -> Unit) {
+fun InicioScreen(onComenzar: () -> Unit, onAcceso: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -66,16 +66,14 @@ fun InicioScreen(onComenzar: () -> Unit, onAcceso: () -> Unit, onConsulta: () ->
         Button(onClick = onComenzar, modifier = Modifier.fillMaxWidth()) { Text("Registrar mi equipo") }
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = onAcceso, modifier = Modifier.fillMaxWidth()) { Text("Acceso jurado / admin") }
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(onClick = onConsulta, modifier = Modifier.fillMaxWidth()) { Text("Consultar mi equipo") }
     }
 }
 
 @Composable
-fun TerminosScreen(terminos: Terminos?, onAceptar: (Int) -> Unit, onVolver: () -> Unit) {
+fun TerminosScreen(categoria: Categoria, terminos: Terminos?, onAceptar: (Int) -> Unit, onVolver: () -> Unit) {
     var acepto by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Términos y condiciones", style = MaterialTheme.typography.headlineSmall)
+        Text("Términos y condiciones — ${categoria.nombre}", style = MaterialTheme.typography.headlineSmall)
         if (terminos != null) Text("Versión ${terminos.version}", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(12.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {

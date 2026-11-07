@@ -2,6 +2,7 @@ package com.utc.guerrarobots.domain.service
 
 import com.utc.guerrarobots.domain.model.Acciones
 import com.utc.guerrarobots.domain.model.AceptacionTerminos
+import com.utc.guerrarobots.domain.model.ClaveCategoria
 import com.utc.guerrarobots.domain.model.Codigo
 import com.utc.guerrarobots.domain.model.ErrorDominio
 import com.utc.guerrarobots.domain.model.Resultado
@@ -22,6 +23,12 @@ class TerminosService(
 ) {
     /** Los términos vigentes (los de la versión más reciente). */
     suspend fun vigente(): Terminos? = repo.vigente()
+
+    /** Los términos para una categoría específica (comunes + reglas de esa categoría). */
+    suspend fun paraCategoria(clave: ClaveCategoria): Terminos? {
+        val reglas = TerminosBase.porCategoria[clave] ?: TerminosBase.reglas
+        return Terminos(1, reglas, reloj.ahora())
+    }
 
     /** Crea la versión 1 si todavía no hay ninguna. Se llama al abrir la app. */
     suspend fun sembrar() {
