@@ -2,6 +2,7 @@ package com.utc.guerrarobots.domain.service
 
 import com.utc.guerrarobots.domain.model.Acciones
 import com.utc.guerrarobots.domain.model.Categoria
+import com.utc.guerrarobots.domain.model.CategoriasBase
 import com.utc.guerrarobots.domain.model.ClaveCategoria
 import com.utc.guerrarobots.domain.model.Codigo
 import com.utc.guerrarobots.domain.model.ConfigTorneo
@@ -14,6 +15,7 @@ import com.utc.guerrarobots.domain.model.Robot
 import com.utc.guerrarobots.domain.model.falla
 import com.utc.guerrarobots.domain.repository.CatalogoRepository
 import com.utc.guerrarobots.domain.repository.EquipoRepository
+import com.utc.guerrarobots.domain.repository.FotoRepository
 import com.utc.guerrarobots.domain.repository.IntentoRepository
 import com.utc.guerrarobots.domain.repository.PartidaRepository
 import com.utc.guerrarobots.domain.repository.Transaccion
@@ -35,6 +37,8 @@ class RegistroService(
     private val intentos: IntentoRepository? = null,
     /** Quién puede eliminar registros. La app lo conecta con la sesión; por defecto no restringe. */
     private val esAdmin: () -> Boolean = { true },
+    /** Donde se guarda la foto del robot. Si es null no se pide foto (así funcionan las pruebas sin base de datos). */
+    private val fotos: FotoRepository? = null,
 ) {
 
     /** Lo que captura la pantalla "Datos de registro". */
@@ -50,6 +54,8 @@ class RegistroService(
         /** Lado más largo del robot, en centímetros. */
         val tamanoCm: Double,
         val logoUri: String? = null,
+        /** Foto del robot en JPEG, ya reducida. Es obligatoria cuando el servicio tiene dónde guardarla. */
+        val foto: ByteArray? = null,
         /** Versión de los términos y condiciones que aceptó el participante. */
         val terminosVersion: Int? = null,
     )
@@ -79,11 +85,15 @@ class RegistroService(
         if (nombreEquipo.isEmpty()) error("nombreEquipo", "Escribe el nombre del equipo")
         if (capitan.isEmpty()) error("capitan", "Escribe el nombre del capitán")
         if (jefe.isEmpty()) error("jefeCarrera", "Escribe el nombre del jefe de carrera")
-        if (integrantes.size !in config.minIntegrantes..config.maxIntegrantes || integrantes.any { it.isEmpty() }) {
-            error(
-                "integrantes",
-                "Registra de ${config.minIntegrantes} a ${config.maxIntegrantes} integrantes, todos con nombre",
-            )
+        // [integrantes] son los demás participantes; el capitán cuenta como participante 1.
+        val info = catalogo.categorias().firstOrNull { it.clave == s.categoria }
+        val maxParticipantes = info?.maxParticipantes ?: CategoriasBase.de(s.categoria).maxParticipantes
+        if (integrantes.any { it.isEmpty() }) {
+            error("integrantes", "Escribe el nombre de cada participante o quita el campo vacío")
+        } else if (integrantes.size + 1 > maxParticipantes) {
+            error("integrantes", "Esta categoría permite máximo $maxParticipantes participantes, contando al capitán")
+        } else if ((listOf(capitan) + integrantes).map { Texto.normalizar(it) }.let { it.size != it.toSet().size }) {
+            error("integrantes", "Hay nombres de participantes repetidos")
         }
         if (nombreRobot.isEmpty()) {
             error("nombreRobot", "Escribe el nombre del robot")
@@ -92,6 +102,17 @@ class RegistroService(
         }
         if (s.pesoG <= 0) error("pesoG", "El peso debe ser mayor que cero")
         if (s.tamanoCm <= 0.0) error("tamanoCm", "El tamaño debe ser mayor que cero")
+
+        if (fotos != null) {
+            val foto = s.foto
+            if (foto == null || foto.isEmpty()) {
+                error("foto", "Sube una foto de tu robot")
+            } else if (!esJpeg(foto)) {
+                error("foto", "La foto no es válida. Elige otra imagen")
+            } else if (foto.size > MAX_FOTO_BYTES) {
+                error("foto", "La foto pesa demasiado. Elige otra")
+            }
+        }
 
         val plantel = catalogo.planteles()
             .firstOrNull { Texto.normalizar(it.nombre) == Texto.normalizar(s.plantel) }
@@ -112,7 +133,6 @@ class RegistroService(
             error("nombreRobot", "Otro equipo ya usa ese nombre de robot", Codigo.DUPLICADO)
         }
 
-        val info = catalogo.categorias().firstOrNull { it.clave == s.categoria }
         if (info == null) {
             error("categoria", "Esa categoría no existe")
         } else if (partidas.listar(s.categoria).isNotEmpty()) {
@@ -138,6 +158,19 @@ class RegistroService(
             robot = Robot(nombreRobot, s.categoria, s.pesoG, s.tamanoCm),
         )
         val id = equipos.insertar(nuevo)
+        if (fotos != null && s.foto != null) {
+            try {
+                fotos.guardar(id, s.foto)
+            } catch (e: Exception) {
+                // Sin foto no hay registro: se deshace el equipo para que pueda intentar de nuevo.
+                try {
+                    equipos.eliminar(id)
+                } catch (e2: Exception) {
+                    // Si tampoco se pudo deshacer, el comité lo verá sin foto en la lista.
+                }
+                throw e
+            }
+        }
         equipos.actualizarFolio(id, "GR-" + id.toString().padStart(4, '0'))
         val creado = equipos.obtener(id)!!
         if (s.terminosVersion != null) terminos?.registrarAceptacion(id, s.terminosVersion)
@@ -187,11 +220,27 @@ class RegistroService(
             return@ejecutar falla(Codigo.CONFLICTO, "El equipo ya tiene intentos capturados y no se puede eliminar. Mejor recházalo")
         }
         equipos.eliminar(equipoId)
+        try {
+            fotos?.eliminar(equipoId)
+        } catch (e: Exception) {
+            // La foto que quede suelta no estorba; lo importante es que el equipo ya no está.
+        }
         auditoria?.registrar(
             Acciones.EQUIPO_ELIMINADO, "equipo", equipoId,
             "${equipo.folio} ${equipo.nombre} · robot ${equipo.robot.nombre} · ${categoria.valor}",
         )
         Resultado.Ok(Unit)
+    }
+
+    /** La foto del robot de un equipo (JPEG), o null si no tiene. */
+    suspend fun foto(equipoId: Long): ByteArray? = fotos?.obtener(equipoId)
+
+    private fun esJpeg(b: ByteArray): Boolean =
+        b.size > 3 && b[0] == 0xFF.toByte() && b[1] == 0xD8.toByte()
+
+    companion object {
+        /** Tope de la foto ya reducida; la app la deja en unos 250 KB, y Firestore guarda hasta 1 MB por documento. */
+        const val MAX_FOTO_BYTES = 600_000
     }
 
     /** Las categorías del torneo, en su orden. */

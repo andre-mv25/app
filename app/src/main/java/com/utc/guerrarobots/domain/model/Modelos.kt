@@ -35,6 +35,8 @@ data class Categoria(
     val cerrada: Boolean = false,
     val intentosMaximos: Int = 2,
     val canchas: Int = 1,
+    /** Máximo de participantes por equipo, contando al capitán (reglamento: 2; fútbol robot: 4). */
+    val maxParticipantes: Int = 2,
     /** Posición al mostrar la lista. */
     val orden: Int = 0,
 )
@@ -43,7 +45,7 @@ data class Categoria(
 object CategoriasBase {
     val porDefecto: List<Categoria> = listOf(
         Categoria(ClaveCategoria.SIGUE_LINEAS, "Sigue líneas", Metodo.RANKING_TIEMPO, intentosMaximos = 2, canchas = 2, orden = 1),
-        Categoria(ClaveCategoria.FUTBOL, "Fútbol robot", Metodo.LLAVES, canchas = 4, orden = 2),
+        Categoria(ClaveCategoria.FUTBOL, "Fútbol robot", Metodo.LLAVES, canchas = 4, maxParticipantes = 4, orden = 2),
         Categoria(ClaveCategoria.LABERINTO, "Laberinto", Metodo.RANKING_TIEMPO, intentosMaximos = 2, canchas = 1, orden = 3),
         Categoria(ClaveCategoria.COMBATE, "Combate", Metodo.LLAVES, canchas = 2, orden = 4),
         Categoria(ClaveCategoria.VELOCIDAD, "Robots de velocidad", Metodo.RANKING_TIEMPO, intentosMaximos = 2, canchas = 1, orden = 5),
@@ -51,6 +53,16 @@ object CategoriasBase {
 
     /** La categoría base con esa clave; si no existe, una genérica por tiempo. */
     fun de(clave: ClaveCategoria): Categoria = porDefecto.firstOrNull { it.clave == clave } ?: Categoria(clave)
+}
+
+/** Los planteles de la Universidad Tres Culturas que participan. */
+object PlantelesBase {
+    val todos: List<String> = listOf(
+        "Aragón", "Atizapán", "Chalco", "Coacalco", "Cuautitlán", "Ecatepec",
+        "Huehuetoca", "Ixtapaluca", "Iztapalapa", "Los Reyes", "Neza",
+        "Observatorio", "Puebla", "Tlalpan", "Tlalnepantla", "Toluca",
+        "Toreo", "Zona Rosa",
+    )
 }
 
 enum class EstadoEquipo { PENDIENTE, REVISION, ACEPTADO, RECHAZADO }
@@ -191,6 +203,8 @@ data class Terminos(
     /** Un renglón por regla. */
     val reglas: List<String>,
     val publicadoEn: Long,
+    /** Sanciones que se aplican en la categoría. Vacío en las versiones viejas. */
+    val sanciones: List<String> = emptyList(),
 )
 
 /** Constancia de que un equipo aceptó una versión de los términos al registrarse. */
@@ -301,6 +315,91 @@ object TerminosBase {
         "Si el equipo no se presenta 2 minutos después de ser llamado, pierde el combate por default.",
         "Es motivo de descalificación: usar dispositivos que puedan dañar a las personas, dañar la arena a propósito, la indisciplina y no presentarse a tiempo.",
         "La última decisión es del juez de coliseo y es irrevocable.",
+    )
+
+    // ---- Sanciones (salen del reglamento oficial; las que dependen de la categoría van aparte) ----
+
+    private val expulsionComun: List<String> = listOf(
+        "Expulsión del evento: insultar o agredir a miembros de la organización o a otros competidores.",
+        "Expulsión del evento: provocar daños de manera intencionada al área de competencia o al recinto.",
+    )
+
+    private const val EXPULSION_DANO_ROBOT =
+        "Expulsión del evento: causar desperfectos de manera intencionada y deliberada a los robots oponentes."
+
+    private val descalificacionComun: List<String> = listOf(
+        "Descalificación: usar dispositivos que puedan causar daños físicos a las personas.",
+        "Descalificación: provocar desperfectos intencionados al área de juego.",
+        "Descalificación: manipular el robot de forma externa, por cualquier medio, una vez iniciada la competencia.",
+    )
+
+    /** Sanciones que valen en todas las categorías. */
+    val sancionesGenerales: List<String> = listOf(
+        "Si en la revisión técnica del día del evento el robot no cumple los requisitos de su categoría, el equipo queda descalificado.",
+        "No presentarse a tiempo cuando se llama al equipo puede causar la descalificación.",
+        "Los jueces pueden expulsar, penalizar o descalificar en los casos no previstos. Sus decisiones son definitivas e inapelables.",
+        "Los jefes de carrera y docentes vigilan el comportamiento de sus participantes durante toda la competencia.",
+    )
+
+    private val sancionesTiempoComun: List<String> = listOf(
+        "Descalificación: que el robot no sea plenamente autónomo después de cruzar la línea de inicio.",
+        "Descalificación: que el robot abandone el área de competencia.",
+        "Descalificación: no completar la trayectoria en el tiempo máximo de 2 minutos.",
+        "Eliminación: no estar listo cuando el robot es llamado (hay una tolerancia de 30 segundos).",
+    )
+
+    private val sancionesSigueLineas: List<String> =
+        expulsionComun + EXPULSION_DANO_ROBOT + descalificacionComun + sancionesTiempoComun + listOf(
+            "Descalificación: que una persona ajena empuje o interrumpa al robot durante su recorrido.",
+        )
+
+    private val sancionesVelocidad: List<String> =
+        expulsionComun + EXPULSION_DANO_ROBOT + descalificacionComun + sancionesTiempoComun + listOf(
+            "Sanción: si una persona ajena empuja o interrumpe al robot, será sancionada; si es del mismo plantel del robot, el plantel queda descalificado de la categoría.",
+        )
+
+    private val sancionesFutbol: List<String> =
+        expulsionComun + EXPULSION_DANO_ROBOT + descalificacionComun + listOf(
+            "Descalificación: causar desperfectos de manera intencionada a un robot oponente.",
+            "Descalificación: que el robot se desarme en más del 60% de sus partes durante el partido.",
+            "Pérdida del partido: no presentarse 2 minutos después de ser llamado.",
+            "Derrota automática: que el capitán solicite detener la competencia.",
+        )
+
+    private val sancionesLaberinto: List<String> =
+        expulsionComun + descalificacionComun + listOf(
+            "Descalificación: no estar en la entrada del laberinto durante la competencia (salvo que el robot ya haya sido descalificado o terminado).",
+            "Descalificación: no encontrar la salida del laberinto en el tiempo establecido.",
+            "Descalificación: que el robot no empiece a avanzar 5 segundos después del banderazo de salida.",
+            "Descalificación inmediata: que el robot pierda partes por chocar con las paredes o quede atrapado sin poder continuar por sí mismo.",
+            "Descalificación directa: indisciplina que impida el desarrollo normal de la competencia.",
+            "Descalificación: no presentarse 2 minutos después de ser llamado.",
+        )
+
+    private val sancionesCombate: List<String> =
+        expulsionComun + descalificacionComun + listOf(
+            "Descalificación: usar materiales peligrosos (sustancias inflamables, materiales corrosivos o elementos cortantes sin control).",
+            "Descalificación: tocar el robot mientras está activa una pausa táctica.",
+            "Descalificación directa: quedarse en el área del coliseo cuando el juez indicó salir.",
+            "Descalificación directa: indisciplina que impida el desarrollo normal de la competencia.",
+            "Pérdida del combate por default: no presentarse 2 minutos después de ser llamado.",
+        )
+
+    /** Las sanciones de cada categoría, más las generales. */
+    val sancionesPorCategoria: Map<ClaveCategoria, List<String>> = mapOf(
+        ClaveCategoria.SIGUE_LINEAS to sancionesSigueLineas + sancionesGenerales,
+        ClaveCategoria.FUTBOL to sancionesFutbol + sancionesGenerales,
+        ClaveCategoria.LABERINTO to sancionesLaberinto + sancionesGenerales,
+        ClaveCategoria.COMBATE to sancionesCombate + sancionesGenerales,
+        ClaveCategoria.VELOCIDAD to sancionesVelocidad + sancionesGenerales,
+    )
+
+    /** Aviso de privacidad que se muestra antes de finalizar el registro. */
+    val avisoPrivacidad: List<String> = listOf(
+        "Los datos del registro (nombre del equipo y del robot, capitán, participantes, jefe de carrera, plantel, peso, tamaño y foto del robot) se usan solo para organizar el torneo: revisión técnica, llaves, tiempos y premiación.",
+        "La foto del robot se usa para la revisión técnica y solo la ve el comité organizador; no se publica.",
+        "En las pantallas públicas de la app solo se muestran el nombre del equipo, el robot y el plantel. Los nombres de las personas solo los ve el comité organizador.",
+        "Al aceptar confirmas que los datos son verdaderos y que conoces el reglamento del torneo.",
     )
 
     /** Los términos de cada categoría: las reglas comunes más las suyas. */

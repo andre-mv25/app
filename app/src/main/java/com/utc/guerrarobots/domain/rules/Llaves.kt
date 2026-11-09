@@ -92,6 +92,52 @@ object Llaves {
         return plan
     }
 
+    /**
+     * Reacomoda el orden de siembra para que en la primera ronda no se enfrenten dos equipos del
+     * mismo plantel. Intercambia equipos de lugar mientras eso baje el número de cruces del mismo
+     * plantel; los lugares de los byes no cambian. Si un plantel tiene más de la mitad de los
+     * equipos es imposible evitarlos todos: en ese caso quedan los menos posibles.
+     * [plantelDe] da el plantel de cada equipo; el resultado tiene los mismos equipos.
+     */
+    fun evitarMismoPlantel(equiposEnOrden: List<Long>, plantelDe: Map<Long, String>): List<Long> {
+        val n = equiposEnOrden.size
+        if (n < 2) return equiposEnOrden
+        val tamano = tamanoCuadro(n)
+        val orden = ordenSemillas(tamano)
+        // Cruces reales de la primera ronda, como posiciones de la lista (los byes no cuentan).
+        val cruces = (0 until tamano / 2).mapNotNull { i ->
+            val a = orden[2 * i] - 1
+            val b = orden[2 * i + 1] - 1
+            if (a < n && b < n) a to b else null
+        }
+        val lista = equiposEnOrden.toMutableList()
+        fun choques(): Int = cruces.count { (a, b) ->
+            val pa = plantelDe[lista[a]]
+            pa != null && pa == plantelDe[lista[b]]
+        }
+        var actual = choques()
+        var mejoro = true
+        var vueltas = 0
+        while (actual > 0 && mejoro && vueltas < 50) {
+            mejoro = false
+            vueltas++
+            for (i in 0 until n) {
+                for (j in i + 1 until n) {
+                    if (actual == 0) break
+                    java.util.Collections.swap(lista, i, j)
+                    val nuevo = choques()
+                    if (nuevo < actual) {
+                        actual = nuevo
+                        mejoro = true
+                    } else {
+                        java.util.Collections.swap(lista, i, j)
+                    }
+                }
+            }
+        }
+        return lista
+    }
+
     fun nombreRonda(ronda: Int, totalRondas: Int): String = when (totalRondas - ronda) {
         0 -> "Final"
         1 -> "Semifinal"

@@ -249,3 +249,24 @@ class PinFirestore(db: FirebaseFirestore, private val scope: CoroutineScope) : P
         scope.launch { doc.set(mapOf(rol.name to hash), SetOptions.merge()).await() }
     }
 }
+
+/**
+ * Fotos de los robots. Cada una es un JPEG ya reducido (unos 250 KB) guardado como texto Base64
+ * en su propio documento, para no cargar las fotos al listar los equipos y sin usar Firebase Storage.
+ */
+class FotoFirestore(db: FirebaseFirestore) : FotoRepository {
+    private val col = db.collection("gr_fotos")
+
+    override suspend fun guardar(equipoId: Long, jpeg: ByteArray) {
+        val texto = android.util.Base64.encodeToString(jpeg, android.util.Base64.NO_WRAP)
+        col.document(equipoId.toString()).set(mapOf("datos" to texto)).await()
+    }
+
+    override suspend fun obtener(equipoId: Long): ByteArray? =
+        col.document(equipoId.toString()).get().await().getString("datos")
+            ?.let { android.util.Base64.decode(it, android.util.Base64.DEFAULT) }
+
+    override suspend fun eliminar(equipoId: Long) {
+        col.document(equipoId.toString()).delete().await()
+    }
+}

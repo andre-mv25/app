@@ -11,6 +11,9 @@ import com.utc.guerrarobots.domain.model.Categoria
 import com.utc.guerrarobots.domain.model.Equipo
 import com.utc.guerrarobots.domain.model.Metodo
 import com.utc.guerrarobots.domain.model.Rol
+import com.utc.guerrarobots.domain.model.Resultado
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 sealed interface Pantalla {
@@ -30,24 +33,38 @@ sealed interface Pantalla {
     data class Llaves(val categoria: Categoria) : Pantalla
 }
 
-/** Espera a que la app se conecte a Firestore antes de mostrar las pantallas. */
+/**
+ * Muestra la pantalla "EL TORNEO REGRESA A CASA" mientras la app se conecta a Firestore (y al menos
+ * unos segundos), y después las pantallas. Si no hay conexión, ofrece reintentar.
+ */
 @Composable
 fun GuerraRobotsNavegacion(contenedor: AppContainer, modifier: Modifier = Modifier) {
     var listo by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var intento by remember { mutableStateOf(0) }
+    var splashTerminado by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
+        delay(3_000)
+        splashTerminado = true
+    }
+    LaunchedEffect(intento) {
+        error = null
         try {
             contenedor.iniciar()
             listo = true
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             val lugar = e.stackTrace.take(6).joinToString("\n") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
             error = (e.message ?: "sin conexión") + "\n" + lugar
         }
     }
+    val mensajeError = error
     when {
-        listo -> NavegacionListo(contenedor, modifier)
-        error != null -> Text("No se pudo conectar: $error", modifier)
-        else -> Text("Conectando...", modifier)
+        mensajeError != null -> PantallaSinConexion(mensajeError, onReintentar = { intento += 1 }, modifier = modifier)
+        listo && splashTerminado -> NavegacionListo(contenedor, modifier)
+        else -> PantallaCarga(modifier)
     }
 }
 
@@ -58,7 +75,10 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
     var planteles by remember { mutableStateOf<List<String>>(emptyList()) }
     var categorias by remember { mutableStateOf<List<Categoria>>(emptyList()) }
     var terminos by remember { mutableStateOf<com.utc.guerrarobots.domain.model.Terminos?>(null) }
-    var versionAceptada by remember { mutableStateOf<Int?>(null) }
+    var borrador by remember { mutableStateOf(BorradorRegistro()) }
+    var erroresRegistro by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var enviando by remember { mutableStateOf(false) }
+    var errorEnvio by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(pantalla) {
         val actual = pantalla
         if (actual is Pantalla.Terminos) {
@@ -80,10 +100,12 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
     }
 
     BackHandler(enabled = pantalla != Pantalla.Inicio) {
-        when (pantalla) {
+        when (val actual = pantalla) {
             Pantalla.Inicio, Pantalla.Categorias, Pantalla.Acceso, Pantalla.Publico -> pantalla = Pantalla.Inicio
             is Pantalla.PublicoCategoria -> pantalla = Pantalla.Publico
-            is Pantalla.Terminos -> pantalla = Pantalla.Categorias
+            is Pantalla.Terminos -> {
+                if (!enviando) pantalla = Pantalla.Registro(actual.categoria)
+            }
             is Pantalla.Registro -> pantalla = Pantalla.Categorias
             is Pantalla.Listo -> pantalla = Pantalla.Inicio
             Pantalla.Panel -> cerrarSesion()
@@ -103,24 +125,70 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                 onElegir = { pantalla = Pantalla.PublicoCategoria(it) },
                 onVolver = { pantalla = Pantalla.Inicio },
             )
-            is Pantalla.Terminos -> TerminosScreen(
-                categoria = p.categoria,
-                terminos = terminos,
-                onAceptar = { versionAceptada = it; pantalla = Pantalla.Registro(p.categoria) },
-                onVolver = { pantalla = Pantalla.Categorias },
-            )
             Pantalla.Categorias -> CategoriasScreen(
                 categorias = categorias,
-                onElegir = { versionAceptada = null; pantalla = Pantalla.Terminos(it) },
+                onElegir = {
+                    borrador = BorradorRegistro()
+                    erroresRegistro = emptyMap()
+                    pantalla = Pantalla.Registro(it)
+                },
                 onVolver = { pantalla = Pantalla.Inicio },
             )
             is Pantalla.Registro -> RegistroScreen(
                 categoria = p.categoria,
                 planteles = planteles,
-                terminosVersion = versionAceptada,
-                onEnviar = { contenedor.registro.registrar(it.copy(terminosVersion = versionAceptada)) },
-                onListo = { pantalla = Pantalla.Listo(it) },
-                onVolver = { pantalla = Pantalla.Terminos(p.categoria) },
+                inicial = borrador,
+                errores = erroresRegistro,
+                onContinuar = {
+                    borrador = it
+                    erroresRegistro = emptyMap()
+                    errorEnvio = null
+                    pantalla = Pantalla.Terminos(p.categoria)
+                },
+                onVolver = { pantalla = Pantalla.Categorias },
+            )
+            // Último paso: aceptar reglas, sanciones y aviso de privacidad. Aquí se envía el registro.
+            is Pantalla.Terminos -> TerminosScreen(
+                categoria = p.categoria,
+                terminos = terminos,
+                enviando = enviando,
+                error = errorEnvio,
+                onAceptar = { version ->
+                    val solicitud = borrador.aSolicitud(p.categoria.clave, version)
+                    if (solicitud == null) {
+                        erroresRegistro = mapOf("general" to "Revisa el peso y el tamaño del robot")
+                        pantalla = Pantalla.Registro(p.categoria)
+                    } else {
+                        scope.launch {
+                            enviando = true
+                            errorEnvio = null
+                            try {
+                                when (val r = contenedor.registro.registrar(solicitud)) {
+                                    is Resultado.Ok -> {
+                                        borrador = BorradorRegistro()
+                                        erroresRegistro = emptyMap()
+                                        pantalla = Pantalla.Listo(r.valor)
+                                    }
+                                    is Resultado.Falla -> {
+                                        val mapa = r.errores.associate { (it.campo ?: "general") to it.mensaje }
+                                        if (mapa.keys.all { it == "terminos" }) {
+                                            errorEnvio = mapa.values.first()
+                                        } else {
+                                            erroresRegistro = mapa
+                                            pantalla = Pantalla.Registro(p.categoria)
+                                        }
+                                    }
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                errorEnvio = "No se pudo enviar el registro. Revisa tu conexión e intenta de nuevo."
+                            }
+                            enviando = false
+                        }
+                    }
+                },
+                onVolver = { pantalla = Pantalla.Registro(p.categoria) },
             )
             is Pantalla.Listo -> ListoScreen(
                 p.equipo,

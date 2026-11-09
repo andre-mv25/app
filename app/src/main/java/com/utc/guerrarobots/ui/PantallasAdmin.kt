@@ -1,6 +1,18 @@
 package com.utc.guerrarobots.ui
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -279,6 +291,39 @@ fun PinJuradoScreen(acceso: AccesoService, auditoria: AuditoriaService, onVolver
     }
 }
 
+/** La foto del robot en la tarjeta del equipo; al tocarla se agranda o se encoge. */
+@Composable
+private fun FotoEquipo(registro: RegistroService, equipoId: Long) {
+    var ampliada by remember { mutableStateOf(false) }
+    val estado by produceState<Pair<Boolean, ImageBitmap?>>(false to null, equipoId) {
+        val imagen = try {
+            withContext(Dispatchers.IO) {
+                registro.foto(equipoId)?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        value = true to imagen
+    }
+    val (listo, imagen) = estado
+    if (imagen != null) {
+        Image(
+            bitmap = imagen,
+            contentDescription = "Foto del robot",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (ampliada) 320.dp else 120.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { ampliada = !ampliada },
+        )
+    } else {
+        Text(if (listo) "Sin foto del robot" else "Cargando foto...", style = MaterialTheme.typography.bodySmall)
+    }
+}
+
 /** Lista de equipos con filtros y botones para aceptar, rechazar o mandar a revisión. */
 @Composable
 fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> Unit) {
@@ -351,8 +396,12 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("${e.folio} · ${e.nombre}", style = MaterialTheme.typography.titleMedium)
                         Text("Capitán: ${e.capitan} · ${e.plantel}")
+                        if (e.integrantes.isNotEmpty()) {
+                            Text("Participantes (${1 + e.integrantes.size}): ${(listOf(e.capitan) + e.integrantes).joinToString(", ")}")
+                        }
                         Text("Robot: ${e.robot.nombre} · ${nombres[e.robot.categoria] ?: e.robot.categoria.valor}")
                         Text("${Peso.formatearKg(e.robot.pesoG)} · ${e.robot.tamanoCm} cm")
+                        FotoEquipo(registro, e.id)
                         Text("Estado: ${etiqueta(e.estado)}", style = MaterialTheme.typography.labelLarge)
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (e.estado != EstadoEquipo.ACEPTADO) Button(onClick = { cambiar(e, EstadoEquipo.ACEPTADO) }) { Text("Aceptar") }

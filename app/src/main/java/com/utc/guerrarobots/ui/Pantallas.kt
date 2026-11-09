@@ -1,7 +1,15 @@
 package com.utc.guerrarobots.ui
 
 import androidx.compose.foundation.background
+import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +51,7 @@ import com.utc.guerrarobots.domain.model.EstadoEquipo
 import com.utc.guerrarobots.domain.model.Metodo
 import com.utc.guerrarobots.domain.model.Resultado
 import com.utc.guerrarobots.domain.model.Terminos
+import com.utc.guerrarobots.domain.model.TerminosBase
 import com.utc.guerrarobots.domain.service.RegistroService
 import com.utc.guerrarobots.domain.rules.Peso
 import kotlinx.coroutines.launch
@@ -58,7 +67,7 @@ fun InicioScreen(onComenzar: () -> Unit, onPublico: () -> Unit, onAcceso: () -> 
         verticalArrangement = Arrangement.Center,
     ) {
         Image(
-            painter = painterResource(R.drawable.logo_torneo),
+            painter = painterResource(R.drawable.logo_torneo_transparente),
             contentDescription = "5° Torneo Guerra de Robots, Universidad Tres Culturas",
             modifier = Modifier.size(240.dp),
         )
@@ -72,30 +81,54 @@ fun InicioScreen(onComenzar: () -> Unit, onPublico: () -> Unit, onAcceso: () -> 
 }
 
 @Composable
-fun TerminosScreen(categoria: Categoria, terminos: Terminos?, onAceptar: (Int) -> Unit, onVolver: () -> Unit) {
+fun TerminosScreen(
+    categoria: Categoria,
+    terminos: Terminos?,
+    enviando: Boolean,
+    error: String?,
+    onAceptar: (Int) -> Unit,
+    onVolver: () -> Unit,
+) {
     var acepto by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Términos y condiciones", style = MaterialTheme.typography.headlineSmall)
+        Text("Último paso", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        Text("Reglas, sanciones y aviso de privacidad", style = MaterialTheme.typography.headlineSmall)
         Text(categoria.nombre, style = MaterialTheme.typography.titleMedium)
-        if (terminos != null) Text("Versión ${terminos.version}", style = MaterialTheme.typography.bodySmall)
+        Text(
+            "Para finalizar tu registro debes leer y aceptar lo siguiente.",
+            style = MaterialTheme.typography.bodySmall,
+        )
         Spacer(Modifier.height(12.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (terminos == null) {
                 Text("Cargando...")
             } else {
+                Text("Reglas de la categoría", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 terminos.reglas.forEachIndexed { i, r -> Text("${i + 1}. $r") }
+                if (terminos.sanciones.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Sanciones por incumplimiento", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                    terminos.sanciones.forEach { Text("• $it") }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Aviso de privacidad", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                TerminosBase.avisoPrivacidad.forEach { Text("• $it") }
             }
         }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = acepto, onCheckedChange = { acepto = it }, enabled = terminos != null)
-            Text("Acepto los términos y condiciones")
+            Checkbox(checked = acepto, onCheckedChange = { acepto = it }, enabled = terminos != null && !enviando)
+            Text(
+                "He leído y acepto las reglas, las sanciones y el aviso de privacidad",
+                modifier = Modifier.weight(1f),
+            )
         }
         Button(
             onClick = { terminos?.let { onAceptar(it.version) } },
-            enabled = acepto && terminos != null,
+            enabled = acepto && terminos != null && !enviando,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Continuar") }
-        TextButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
+        ) { Text(if (enviando) "Enviando registro..." else "Aceptar y finalizar registro") }
+        TextButton(onClick = onVolver, enabled = !enviando, modifier = Modifier.fillMaxWidth()) { Text("Volver al formulario") }
     }
 }
 
@@ -169,26 +202,82 @@ private fun Campo(
     )
 }
 
+/** Lo que el participante lleva escrito en el formulario; se conserva al ir a los términos y volver. */
+data class BorradorRegistro(
+    val nombreEquipo: String = "",
+    val capitan: String = "",
+    /** Los demás participantes (el capitán cuenta aparte como participante 1). */
+    val integrantes: List<String> = emptyList(),
+    val jefe: String = "",
+    val plantel: String = "",
+    val nombreRobot: String = "",
+    val pesoTxt: String = "",
+    val tamanoTxt: String = "",
+    /** La foto del robot ya reducida (JPEG). */
+    val foto: ByteArray? = null,
+) {
+    /** La solicitud para el servicio; null si el peso o el tamaño no son números. */
+    fun aSolicitud(categoria: ClaveCategoria, terminosVersion: Int?): RegistroService.SolicitudRegistro? {
+        val peso = Peso.kgAGramos(pesoTxt) ?: return null
+        val tamano = tamanoTxt.trim().replace(',', '.').toDoubleOrNull() ?: return null
+        return RegistroService.SolicitudRegistro(
+            nombreEquipo = nombreEquipo,
+            capitan = capitan,
+            integrantes = integrantes.map { it.trim() },
+            jefeCarrera = jefe,
+            plantel = plantel,
+            nombreRobot = nombreRobot,
+            categoria = categoria,
+            pesoG = peso,
+            tamanoCm = tamano,
+            terminosVersion = terminosVersion,
+            foto = foto,
+        )
+    }
+}
+
 @Composable
 fun RegistroScreen(
     categoria: Categoria,
-    terminosVersion: Int?,
     planteles: List<String>,
-    onEnviar: suspend (RegistroService.SolicitudRegistro) -> Resultado<Equipo>,
-    onListo: (Equipo) -> Unit,
+    inicial: BorradorRegistro,
+    errores: Map<String, String>,
+    onContinuar: (BorradorRegistro) -> Unit,
     onVolver: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
-    var nombreEquipo by remember { mutableStateOf("") }
-    var capitan by remember { mutableStateOf("") }
-    var jefe by remember { mutableStateOf("") }
-    var plantel by remember { mutableStateOf("") }
-    var nombreRobot by remember { mutableStateOf("") }
-    var pesoTxt by remember { mutableStateOf("") }
-    var tamanoTxt by remember { mutableStateOf("") }
+    var nombreEquipo by remember { mutableStateOf(inicial.nombreEquipo) }
+    var capitan by remember { mutableStateOf(inicial.capitan) }
+    val integrantes = remember { mutableStateListOf<String>().apply { addAll(inicial.integrantes) } }
+    var jefe by remember { mutableStateOf(inicial.jefe) }
+    var plantel by remember { mutableStateOf(inicial.plantel) }
+    var nombreRobot by remember { mutableStateOf(inicial.nombreRobot) }
+    var pesoTxt by remember { mutableStateOf(inicial.pesoTxt) }
+    var tamanoTxt by remember { mutableStateOf(inicial.tamanoTxt) }
     var menuPlantel by remember { mutableStateOf(false) }
-    var errores by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var enviando by remember { mutableStateOf(false) }
+    var erroresVisibles by remember { mutableStateOf(errores) }
+    var foto by remember { mutableStateOf(inicial.foto) }
+    var procesandoFoto by remember { mutableStateOf(false) }
+    val contexto = LocalContext.current
+    val scopeFoto = rememberCoroutineScope()
+    val selectorFoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scopeFoto.launch {
+                procesandoFoto = true
+                val bytes = FotoRobot.preparar(contexto, uri)
+                if (bytes == null) {
+                    erroresVisibles = erroresVisibles + ("foto" to "No se pudo leer esa foto. Elige otra")
+                } else {
+                    foto = bytes
+                    erroresVisibles = erroresVisibles - "foto"
+                }
+                procesandoFoto = false
+            }
+        }
+    }
+    val vistaPreviaFoto = remember(foto) {
+        foto?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
+    }
+    val maxExtra = (categoria.maxParticipantes - 1).coerceAtLeast(0)
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -196,10 +285,29 @@ fun RegistroScreen(
     ) {
         Text("Registro · ${categoria.nombre}", style = MaterialTheme.typography.headlineSmall)
 
-        Campo(nombreEquipo, { nombreEquipo = it }, "Nombre del equipo", errores["nombreEquipo"])
-        Campo(capitan, { capitan = it }, "Capitán", errores["capitan"])
+        Campo(nombreEquipo, { nombreEquipo = it }, "Nombre del equipo", erroresVisibles["nombreEquipo"])
 
-        Campo(jefe, { jefe = it }, "Jefe de carrera", errores["jefeCarrera"])
+        Text(
+            "Participantes: ${1 + integrantes.size} de ${categoria.maxParticipantes} (contando al capitán)",
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Campo(capitan, { capitan = it }, "Capitán (participante 1)", erroresVisibles["capitan"])
+        integrantes.forEachIndexed { i, nombre ->
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Campo(nombre, { integrantes[i] = it }, "Participante ${i + 2}", null)
+                }
+                TextButton(onClick = { integrantes.removeAt(i) }) { Text("Quitar") }
+            }
+        }
+        if (integrantes.size < maxExtra) {
+            OutlinedButton(onClick = { integrantes.add("") }, modifier = Modifier.fillMaxWidth()) {
+                Text("Agregar participante")
+            }
+        }
+        erroresVisibles["integrantes"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+        Campo(jefe, { jefe = it }, "Jefe de carrera", erroresVisibles["jefeCarrera"])
 
         OutlinedButton(onClick = { menuPlantel = !menuPlantel }, modifier = Modifier.fillMaxWidth()) {
             Text(plantel.ifEmpty { "Elige tu plantel" })
@@ -224,58 +332,87 @@ fun RegistroScreen(
                 }
             }
         }
-        errores["plantel"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        erroresVisibles["plantel"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-        Campo(nombreRobot, { nombreRobot = it }, "Nombre del robot (máx. 15)", errores["nombreRobot"])
-        Campo(pesoTxt, { pesoTxt = it }, "Peso (kg)", errores["pesoG"], KeyboardType.Decimal)
-        Campo(tamanoTxt, { tamanoTxt = it }, "Tamaño: lado más largo (cm)", errores["tamanoCm"], KeyboardType.Decimal)
+        Campo(nombreRobot, { nombreRobot = it }, "Nombre del robot (máx. 15)", erroresVisibles["nombreRobot"])
+        Campo(pesoTxt, { pesoTxt = it }, "Peso (kg)", erroresVisibles["pesoG"], KeyboardType.Decimal)
+        Campo(tamanoTxt, { tamanoTxt = it }, "Tamaño: lado más largo (cm)", erroresVisibles["tamanoCm"], KeyboardType.Decimal)
         Text(
             "Si el peso o el tamaño sale de los límites de la categoría, tu registro pasará a revisión técnica.",
             style = MaterialTheme.typography.bodySmall,
         )
 
-        errores["categoria"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        errores["terminos"]?.let { Text(it + ". Regresa y acepta los términos de la categoría.", color = MaterialTheme.colorScheme.error) }
-        errores["general"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        Text("Foto del robot (obligatoria)", style = MaterialTheme.typography.labelLarge)
+        if (vistaPreviaFoto != null) {
+            Image(
+                bitmap = vistaPreviaFoto,
+                contentDescription = "Foto del robot",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)),
+            )
+        }
+        OutlinedButton(
+            onClick = {
+                selectorFoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            enabled = !procesandoFoto,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                when {
+                    procesandoFoto -> "Preparando foto..."
+                    foto == null -> "Elegir foto del robot"
+                    else -> "Cambiar foto"
+                },
+            )
+        }
+        erroresVisibles["foto"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
+        erroresVisibles["categoria"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        erroresVisibles["terminos"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        erroresVisibles["general"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+        Text(
+            "Al continuar verás las reglas, las sanciones y el aviso de privacidad. Debes aceptarlos para finalizar tu registro.",
+            style = MaterialTheme.typography.bodySmall,
+        )
         Button(
-            enabled = !enviando,
             modifier = Modifier.fillMaxWidth(),
             onClick = {
-                val peso = Peso.kgAGramos(pesoTxt)
-                val tamano = tamanoTxt.trim().replace(',', '.').toDoubleOrNull()
-                val locales = buildMap {
-                    if (peso == null) put("pesoG", "Escribe el peso")
-                    if (tamano == null) put("tamanoCm", "Escribe el tamaño en centímetros")
-                }
-                if (peso == null || tamano == null) {
-                    errores = locales
-                } else {
-                    scope.launch {
-                        enviando = true
-                        val resultado = onEnviar(
-                            RegistroService.SolicitudRegistro(
-                                nombreEquipo = nombreEquipo,
-                                capitan = capitan,
-                                integrantes = emptyList(),
-                                jefeCarrera = jefe,
-                                plantel = plantel,
-                                nombreRobot = nombreRobot,
-                                categoria = categoria.clave,
-                                pesoG = peso,
-                                tamanoCm = tamano,
-                                terminosVersion = terminosVersion,
-                            ),
-                        )
-                        enviando = false
-                        when (resultado) {
-                            is Resultado.Ok -> onListo(resultado.valor)
-                            is Resultado.Falla -> errores = resultado.errores.associate { (it.campo ?: "general") to it.mensaje }
-                        }
+                val locales = buildMap<String, String> {
+                    if (nombreEquipo.isBlank()) put("nombreEquipo", "Escribe el nombre del equipo")
+                    if (capitan.isBlank()) put("capitan", "Escribe el nombre del capitán")
+                    if (integrantes.any { it.isBlank() }) {
+                        put("integrantes", "Escribe el nombre de cada participante o quita el campo vacío")
                     }
+                    if (jefe.isBlank()) put("jefeCarrera", "Escribe el nombre del jefe de carrera")
+                    if (plantel.isBlank()) put("plantel", "Elige tu plantel")
+                    if (nombreRobot.isBlank()) put("nombreRobot", "Escribe el nombre del robot")
+                    if (Peso.kgAGramos(pesoTxt) == null) put("pesoG", "Escribe el peso")
+                    if (tamanoTxt.trim().replace(',', '.').toDoubleOrNull() == null) {
+                        put("tamanoCm", "Escribe el tamaño en centímetros")
+                    }
+                    if (foto == null) put("foto", "Sube una foto de tu robot")
+                }
+                erroresVisibles = locales
+                if (locales.isEmpty()) {
+                    onContinuar(
+                        BorradorRegistro(
+                            nombreEquipo = nombreEquipo,
+                            capitan = capitan,
+                            integrantes = integrantes.toList(),
+                            jefe = jefe,
+                            plantel = plantel,
+                            nombreRobot = nombreRobot,
+                            pesoTxt = pesoTxt,
+                            tamanoTxt = tamanoTxt,
+                            foto = foto,
+                        ),
+                    )
                 }
             },
-        ) { Text(if (enviando) "Enviando..." else "Registrar equipo") }
+            enabled = !procesandoFoto,
+        ) { Text("Continuar") }
         TextButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
     }
 }

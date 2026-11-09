@@ -3,6 +3,7 @@ package com.utc.guerrarobots.di
 import com.google.firebase.firestore.FirebaseFirestore
 import com.utc.guerrarobots.data.firebase.*
 import com.utc.guerrarobots.domain.model.CategoriasBase
+import com.utc.guerrarobots.domain.model.PlantelesBase
 import com.utc.guerrarobots.domain.model.ConfigTorneo
 import com.utc.guerrarobots.domain.model.Rol
 import com.utc.guerrarobots.domain.repository.Reloj
@@ -32,6 +33,7 @@ class AppContainer(
     private val bitacora = AuditoriaFirestore(db, contadores)
     private val versionesTerminos = TerminosFirestore(db, contadores)
     private val autorizados = AutorizacionFirestore(db)
+    private val fotos = FotoFirestore(db)
 
     val acceso = AccesoService(pines)
     val sesion = SesionService(autorizados, acceso)
@@ -42,6 +44,7 @@ class AppContainer(
         equipos, catalogo, partidas, tx, config, auditoria, terminos,
         intentos = intentos,
         esAdmin = { acceso.puede(Rol.ADMIN) },
+        fotos = fotos,
     )
     val llaves = LlavesService(equipos, partidas, sorteos, catalogo, tx, reloj, auditoria)
     val tiempos = TiemposService(equipos, intentos, sorteos, catalogo, tx, reloj, config, auditoria)
@@ -52,14 +55,11 @@ class AppContainer(
         pines.cargar()
         val guardadas = catalogo.categorias().map { it.clave }.toSet()
         CategoriasBase.porDefecto.filter { it.clave !in guardadas }.forEach { catalogo.guardarCategoria(it) }
-        if (catalogo.planteles().isEmpty()) {
-            listOf(
-                "Aragón", "Atizapán", "Chalco", "Coacalco", "Cuautitlán", "Ecatepec",
-                "Huehuetoca", "Ixtapaluca", "Iztapalapa", "Los Reyes", "Neza",
-                "Observatorio", "Puebla", "Tlalpan", "Tlalnepantla", "Toluca",
-                "Toreo", "Zona Rosa",
-            ).forEach { catalogo.agregarPlantel(it) }
-        }
+        // Se agregan los que falten, no solo cuando la lista está vacía: así todos los planteles se pueden elegir.
+        val plantelesGuardados = catalogo.planteles().map { Texto.normalizar(it.nombre) }.toSet()
+        PlantelesBase.todos
+            .filter { Texto.normalizar(it) !in plantelesGuardados }
+            .forEach { catalogo.agregarPlantel(it) }
         if (catalogo.palabrasBloqueadas().isEmpty()) {
             listOf("puto", "puta", "pendejo", "mierda", "verga", "chingar", "cabron", "culero")
                 .forEach { catalogo.agregarPalabraBloqueada(Texto.normalizar(it)) }

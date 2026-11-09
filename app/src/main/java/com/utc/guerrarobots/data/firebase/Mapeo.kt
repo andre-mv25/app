@@ -102,6 +102,7 @@ object Mapeo {
         "clave" to c.clave.valor, "nombre" to c.nombre, "metodo" to c.metodo.name,
         "pesoMinG" to c.pesoMinG, "pesoMaxG" to c.pesoMaxG, "tamanoMaxCm" to c.tamanoMaxCm,
         "cerrada" to c.cerrada, "intentosMaximos" to c.intentosMaximos, "canchas" to c.canchas, "orden" to c.orden,
+        "maxParticipantes" to c.maxParticipantes,
     )
 
     /** Los documentos viejos no traen nombre, método, intentos ni canchas: se completan con la categoría base. */
@@ -118,6 +119,7 @@ object Mapeo {
             intentosMaximos = intOrNull(m, "intentosMaximos") ?: base.intentosMaximos,
             canchas = intOrNull(m, "canchas") ?: base.canchas,
             orden = intOrNull(m, "orden") ?: base.orden,
+            maxParticipantes = intOrNull(m, "maxParticipantes") ?: base.maxParticipantes,
         )
     }
 }

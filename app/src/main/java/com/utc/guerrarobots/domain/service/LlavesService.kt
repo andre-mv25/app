@@ -85,7 +85,10 @@ class LlavesService(
         val (orden, semillaUsada) = when (tipo) {
             TipoSorteo.ALEATORIO -> {
                 val s = semilla ?: reloj.ahora()
-                Pair(ids.sorted().shuffled(Random(s)), s)
+                val baraja = ids.sorted().shuffled(Random(s))
+                // En la primera ronda no se enfrentan equipos del mismo plantel (en lo posible).
+                val plantelDe = aceptados.associate { it.id to it.plantel }
+                Pair(Llaves.evitarMismoPlantel(baraja, plantelDe), s)
             }
             TipoSorteo.MANUAL -> {
                 if (ordenManual == null || ordenManual.size != ids.size || ordenManual.toSet() != ids.toSet()) {

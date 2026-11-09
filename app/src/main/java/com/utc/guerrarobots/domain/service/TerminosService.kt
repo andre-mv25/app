@@ -27,7 +27,10 @@ class TerminosService(
     /** Los términos para una categoría específica (comunes + reglas de esa categoría). */
     suspend fun paraCategoria(clave: ClaveCategoria): Terminos? {
         val reglas = TerminosBase.porCategoria[clave] ?: TerminosBase.reglas
-        return Terminos(1, reglas, reloj.ahora())
+        val sanciones = TerminosBase.sancionesPorCategoria[clave] ?: TerminosBase.sancionesGenerales
+        // Debe coincidir con la versión vigente: es la que se revisa al registrar.
+        val version = repo.vigente()?.version ?: 1
+        return Terminos(version, reglas, reloj.ahora(), sanciones)
     }
 
     /** Crea la versión 1 si todavía no hay ninguna. Se llama al abrir la app. */

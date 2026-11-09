@@ -53,6 +53,13 @@ interface EquipoRepository {
     suspend fun eliminar(id: Long)
 }
 
+/** Guarda la foto de cada robot (una imagen JPEG ya reducida), aparte de los datos del equipo. */
+interface FotoRepository {
+    suspend fun guardar(equipoId: Long, jpeg: ByteArray)
+    suspend fun obtener(equipoId: Long): ByteArray?
+    suspend fun eliminar(equipoId: Long)
+}
+
 interface PartidaRepository {
     suspend fun insertar(partida: Partida): Long
     suspend fun obtener(id: Long): Partida?

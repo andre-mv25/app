@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Android 12 o más nuevo: el fondo de la pantalla de arranque del sistema también es oscuro. -->
+    <style name="Theme.GuerraRobots" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@drawable/fondo_arranque</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenBackground">#080C1E</item>
+    </style>
+</resources>
