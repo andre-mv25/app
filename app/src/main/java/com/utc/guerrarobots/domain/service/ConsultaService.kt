@@ -74,6 +74,13 @@ class ConsultaService(
             .take(10)
     }
 
+    /** Busca un equipo exacto por folio (sin importar mayúsculas ni acentos). Devuelve null si no existe. */
+    suspend fun buscarPorFolio(folio: String): Equipo? {
+        val q = Texto.normalizar(folio)
+        return equipos.listar()
+            .firstOrNull { Texto.normalizar(it.folio) == q && it.estado != EstadoEquipo.RECHAZADO }
+    }
+
     /** La situación actual de un equipo. Si todavía no está aceptado, solo trae sus datos. */
     suspend fun consultar(equipoId: Long): Resultado<Consulta> {
         val equipo = equipos.obtener(equipoId)

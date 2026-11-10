@@ -24,6 +24,7 @@ sealed interface Pantalla {
     data object Categorias : Pantalla
     data class Registro(val categoria: Categoria) : Pantalla
     data class Listo(val equipo: Equipo) : Pantalla
+    data class Competidor(val folio: String = "") : Pantalla
     data object Acceso : Pantalla
     data object Panel : Pantalla
     data object Equipos : Pantalla
@@ -101,7 +102,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
 
     BackHandler(enabled = pantalla != Pantalla.Inicio) {
         when (val actual = pantalla) {
-            Pantalla.Inicio, Pantalla.Categorias, Pantalla.Acceso, Pantalla.Publico -> pantalla = Pantalla.Inicio
+            Pantalla.Inicio, Pantalla.Categorias, Pantalla.Acceso, Pantalla.Publico, Pantalla.Competidor -> pantalla = Pantalla.Inicio
             is Pantalla.PublicoCategoria -> pantalla = Pantalla.Publico
             is Pantalla.Terminos -> {
                 if (!enviando) pantalla = Pantalla.Registro(actual.categoria)
@@ -119,10 +120,16 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                 onComenzar = { pantalla = Pantalla.Categorias },
                 onPublico = { pantalla = Pantalla.Publico },
                 onAcceso = { pantalla = Pantalla.Acceso },
+                onMiCompetencia = { pantalla = Pantalla.Competidor("") },
             )
             Pantalla.Publico -> PublicoScreen(
                 categorias = categorias,
                 onElegir = { pantalla = Pantalla.PublicoCategoria(it) },
+                onVolver = { pantalla = Pantalla.Inicio },
+            )
+            Pantalla.Competidor -> PantallaCompetidor(
+                servicio = contenedor.consulta,
+                folioInicial = if (p is Pantalla.Competidor) p.folio else "",
                 onVolver = { pantalla = Pantalla.Inicio },
             )
             Pantalla.Categorias -> CategoriasScreen(
