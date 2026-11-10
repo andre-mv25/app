@@ -398,6 +398,7 @@ object TerminosBase {
     val avisoPrivacidad: List<String> = listOf(
         "Los datos del registro (nombre del equipo y del robot, capitán, participantes, jefe de carrera, plantel, peso, tamaño y foto del robot) se usan solo para organizar el torneo: revisión técnica, llaves, tiempos y premiación.",
         "La foto del robot se usa para la revisión técnica y solo la ve el comité organizador; no se publica.",
+        "Al finalizar el registro recibirás un código QR con tu folio y los datos de tu registro: muéstralo solo a quien lo necesite, por ejemplo al comité en el evento.",
         "En las pantallas públicas de la app solo se muestran el nombre del equipo, el robot y el plantel. Los nombres de las personas solo los ve el comité organizador.",
         "Al aceptar confirmas que los datos son verdaderos y que conoces el reglamento del torneo.",
     )

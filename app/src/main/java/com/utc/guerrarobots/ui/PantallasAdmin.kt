@@ -335,10 +335,20 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
     var categorias by remember { mutableStateOf<List<Categoria>>(emptyList()) }
     var mensaje by remember { mutableStateOf<String?>(null) }
     var porEliminar by remember { mutableStateOf<Equipo?>(null) }
+    var verQr by remember { mutableStateOf<Equipo?>(null) }
     val nombres = categorias.associate { it.clave to it.nombre }
 
     LaunchedEffect(Unit) { categorias = registro.categorias() }
     LaunchedEffect(categoria, estado, version) { lista = registro.listar(estado, categoria) }
+
+    verQr?.let { equipo ->
+        AlertDialog(
+            onDismissRequest = { verQr = null },
+            title = { Text("QR · ${equipo.folio}") },
+            text = { QrRegistro(equipo, nombres[equipo.robot.categoria] ?: equipo.robot.categoria.valor, tamano = 240.dp) },
+            confirmButton = { TextButton(onClick = { verQr = null }) { Text("Cerrar") } },
+        )
+    }
 
     fun cambiar(equipo: Equipo, nuevo: EstadoEquipo) {
         scope.launch {
@@ -407,6 +417,7 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                             if (e.estado != EstadoEquipo.ACEPTADO) Button(onClick = { cambiar(e, EstadoEquipo.ACEPTADO) }) { Text("Aceptar") }
                             if (e.estado != EstadoEquipo.REVISION) OutlinedButton(onClick = { cambiar(e, EstadoEquipo.REVISION) }) { Text("Revisión") }
                             if (e.estado != EstadoEquipo.RECHAZADO) OutlinedButton(onClick = { cambiar(e, EstadoEquipo.RECHAZADO) }) { Text("Rechazar") }
+                            TextButton(onClick = { verQr = e }) { Text("Ver QR") }
                             if (esAdmin) {
                                 TextButton(onClick = { porEliminar = e }) {
                                     Text("Eliminar", color = MaterialTheme.colorScheme.error)

@@ -93,10 +93,15 @@ object Llaves {
     }
 
     /**
-     * Reacomoda el orden de siembra para que en la primera ronda no se enfrenten dos equipos del
-     * mismo plantel. Intercambia equipos de lugar mientras eso baje el número de cruces del mismo
-     * plantel; los lugares de los byes no cambian. Si un plantel tiene más de la mitad de los
-     * equipos es imposible evitarlos todos: en ese caso quedan los menos posibles.
+     * Reacomoda el orden de siembra para que ningún equipo se enfrente, en su primer cruce real, a
+     * uno de su mismo plantel. Se cuidan tres casos:
+     *  - los cruces de la primera ronda;
+     *  - los cruces de la segunda ronda entre dos equipos que tuvieron bye (ya se sabe quiénes son);
+     *  - un equipo con bye contra cada uno de los dos que pelean por pasar (todavía no se sabe quién
+     *    gana, pero ninguno debe ser de su plantel).
+     * Intercambia equipos de lugar mientras eso baje los cruces del mismo plantel; los lugares de los
+     * byes no cambian. Si un plantel tiene más de la mitad de los equipos es imposible evitarlos
+     * todos: en ese caso quedan los menos posibles.
      * [plantelDe] da el plantel de cada equipo; el resultado tiene los mismos equipos.
      */
     fun evitarMismoPlantel(equiposEnOrden: List<Long>, plantelDe: Map<Long, String>): List<Long> {
@@ -104,18 +109,44 @@ object Llaves {
         if (n < 2) return equiposEnOrden
         val tamano = tamanoCuadro(n)
         val orden = ordenSemillas(tamano)
-        // Cruces reales de la primera ronda, como posiciones de la lista (los byes no cuentan).
-        val cruces = (0 until tamano / 2).mapNotNull { i ->
-            val a = orden[2 * i] - 1
-            val b = orden[2 * i + 1] - 1
-            if (a < n && b < n) a to b else null
-        }
         val lista = equiposEnOrden.toMutableList()
-        fun choques(): Int = cruces.count { (a, b) ->
-            val pa = plantelDe[lista[a]]
-            pa != null && pa == plantelDe[lista[b]]
+
+        fun mismo(a: Long, b: Long): Boolean {
+            val pa = plantelDe[a]
+            return pa != null && pa == plantelDe[b]
         }
-        var actual = choques()
+
+        // Mientras más bajo, mejor. Los cruces seguros pesan 1000; los que dependen de quién gane, 1.
+        fun costo(): Int {
+            val cruces = (0 until tamano / 2).map { i ->
+                lista.getOrNull(orden[2 * i] - 1) to lista.getOrNull(orden[2 * i + 1] - 1)
+            }
+            fun esBye(c: Pair<Long?, Long?>) = c.first == null || c.second == null
+            fun candidatos(c: Pair<Long?, Long?>) = listOfNotNull(c.first, c.second)
+            var seguros = 0
+            var posibles = 0
+            for (c in cruces) {
+                val a = c.first
+                val b = c.second
+                if (a != null && b != null && mismo(a, b)) seguros++
+            }
+            for (i in 0 until cruces.size - 1 step 2) {
+                val izquierdo = cruces[i]
+                val derecho = cruces[i + 1]
+                val byeIzquierdo = esBye(izquierdo)
+                val byeDerecho = esBye(derecho)
+                if (!byeIzquierdo && !byeDerecho) continue   // los dos ya jugaron en la ronda 1
+                for (x in candidatos(izquierdo)) {
+                    for (y in candidatos(derecho)) {
+                        if (!mismo(x, y)) continue
+                        if (byeIzquierdo && byeDerecho) seguros++ else posibles++
+                    }
+                }
+            }
+            return seguros * 1000 + posibles
+        }
+
+        var actual = costo()
         var mejoro = true
         var vueltas = 0
         while (actual > 0 && mejoro && vueltas < 50) {
@@ -125,7 +156,7 @@ object Llaves {
                 for (j in i + 1 until n) {
                     if (actual == 0) break
                     java.util.Collections.swap(lista, i, j)
-                    val nuevo = choques()
+                    val nuevo = costo()
                     if (nuevo < actual) {
                         actual = nuevo
                         mejoro = true

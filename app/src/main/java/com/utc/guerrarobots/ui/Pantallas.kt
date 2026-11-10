@@ -2,6 +2,8 @@ package com.utc.guerrarobots.ui
 
 import androidx.compose.foundation.background
 import android.graphics.BitmapFactory
+import android.os.Build
+import com.utc.guerrarobots.domain.rules.CodigoRegistro
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -43,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.utc.guerrarobots.domain.model.Categoria
 import com.utc.guerrarobots.domain.model.ClaveCategoria
@@ -419,8 +422,11 @@ fun RegistroScreen(
 
 @Composable
 fun ListoScreen(equipo: Equipo, nombreCategoria: String, onInicio: () -> Unit) {
+    val contexto = LocalContext.current
+    val qr = remember(equipo, nombreCategoria) { QrBitmap.generar(CodigoRegistro.texto(equipo, nombreCategoria)) }
+    var guardado by remember { mutableStateOf<Boolean?>(null) }
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -436,7 +442,31 @@ fun ListoScreen(equipo: Equipo, nombreCategoria: String, onInicio: () -> Unit) {
                 else -> "Tu registro está en espera de aceptación."
             },
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
+        Text("Tu código QR", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        QrImagen(qr)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Al escanearlo aparecen tu folio y los datos de tu registro. Guárdalo y muéstralo en el evento.",
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { guardado = QrBitmap.guardarEnGaleria(contexto, qr, "QR-${equipo.folio}") },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Guardar QR en la galería") }
+            when (guardado) {
+                true -> Text("QR guardado en Imágenes/GuerraRobots", style = MaterialTheme.typography.bodySmall)
+                false -> Text("No se pudo guardar. Toma una captura de pantalla.", color = MaterialTheme.colorScheme.error)
+                null -> {}
+            }
+        } else {
+            Text("Toma una captura de pantalla para guardarlo.", style = MaterialTheme.typography.bodySmall)
+        }
+        Spacer(Modifier.height(20.dp))
         Button(onClick = onInicio, modifier = Modifier.fillMaxWidth()) { Text("Volver al inicio") }
     }
 }
