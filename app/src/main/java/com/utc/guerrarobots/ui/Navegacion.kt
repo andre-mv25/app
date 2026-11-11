@@ -102,7 +102,8 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
 
     BackHandler(enabled = pantalla != Pantalla.Inicio) {
         when (val actual = pantalla) {
-            Pantalla.Inicio, Pantalla.Categorias, Pantalla.Acceso, Pantalla.Publico, Pantalla.Competidor -> pantalla = Pantalla.Inicio
+            Pantalla.Inicio, Pantalla.Categorias, Pantalla.Acceso, Pantalla.Publico -> pantalla = Pantalla.Inicio
+            is Pantalla.Competidor -> pantalla = Pantalla.Inicio
             is Pantalla.PublicoCategoria -> pantalla = Pantalla.Publico
             is Pantalla.Terminos -> {
                 if (!enviando) pantalla = Pantalla.Registro(actual.categoria)
@@ -127,9 +128,9 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                 onElegir = { pantalla = Pantalla.PublicoCategoria(it) },
                 onVolver = { pantalla = Pantalla.Inicio },
             )
-            Pantalla.Competidor -> PantallaCompetidor(
+            is Pantalla.Competidor -> PantallaCompetidor(
                 servicio = contenedor.consulta,
-                folioInicial = if (p is Pantalla.Competidor) p.folio else "",
+                folioInicial = p.folio,
                 onVolver = { pantalla = Pantalla.Inicio },
             )
             Pantalla.Categorias -> CategoriasScreen(
