@@ -50,6 +50,7 @@ interface EquipoRepository {
     suspend fun actualizarEstado(id: Long, estado: EstadoEquipo)
     suspend fun actualizarFolio(id: Long, folio: String)
     suspend fun actualizarLogo(id: Long, logoUri: String?)
+    suspend fun registrarAsistencia(id: Long, presente: Boolean, horaMs: Long? = System.currentTimeMillis())
     suspend fun eliminar(id: Long)
 }
 

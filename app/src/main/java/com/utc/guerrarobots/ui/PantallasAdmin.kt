@@ -324,12 +324,14 @@ private fun FotoEquipo(registro: RegistroService, equipoId: Long) {
     }
 }
 
-/** Lista de equipos con filtros y botones para aceptar, rechazar o mandar a revisión. */
+/** Lista de equipos con filtros y botones para aceptar, rechazar, marcar asistencia (Checklist) y exportar a Excel. */
 @Composable
 fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> Unit) {
+    val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var categoria by remember { mutableStateOf<ClaveCategoria?>(null) }
     var estado by remember { mutableStateOf<EstadoEquipo?>(null) }
+    var busquedaFolio by remember { mutableStateOf("") }
     var version by remember { mutableStateOf(0) }
     var lista by remember { mutableStateOf<List<Equipo>>(emptyList()) }
     var categorias by remember { mutableStateOf<List<Categoria>>(emptyList()) }
@@ -340,6 +342,19 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
 
     LaunchedEffect(Unit) { categorias = registro.categorias() }
     LaunchedEffect(categoria, estado, version) { lista = registro.listar(estado, categoria) }
+
+    val listaFiltrada = remember(lista, busquedaFolio) {
+        if (busquedaFolio.isBlank()) lista
+        else {
+            val q = busquedaFolio.trim().lowercase()
+            lista.filter {
+                it.folio.lowercase().contains(q) ||
+                    it.nombre.lowercase().contains(q) ||
+                    it.robot.nombre.lowercase().contains(q) ||
+                    it.capitan.lowercase().contains(q)
+            }
+        }
+    }
 
     verQr?.let { equipo ->
         AlertDialog(
@@ -353,6 +368,15 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
     fun cambiar(equipo: Equipo, nuevo: EstadoEquipo) {
         scope.launch {
             when (val r = registro.cambiarEstado(equipo.id, nuevo)) {
+                is Resultado.Ok -> { mensaje = null; version += 1 }
+                is Resultado.Falla -> mensaje = r.primero.mensaje
+            }
+        }
+    }
+
+    fun cambiarAsistencia(equipo: Equipo) {
+        scope.launch {
+            when (val r = registro.marcarAsistencia(equipo.id, !equipo.asistencia)) {
                 is Resultado.Ok -> { mensaje = null; version += 1 }
                 is Resultado.Falla -> mensaje = r.primero.mensaje
             }
@@ -385,7 +409,36 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Equipos registrados (${lista.size})", style = MaterialTheme.typography.headlineSmall)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column {
+                Text("Equipos registrados (${listaFiltrada.size})", style = MaterialTheme.typography.headlineSmall)
+                val presentes = listaFiltrada.count { it.asistencia }
+                Text("Asistencia en sitio: $presentes / ${listaFiltrada.size} llegaron", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = { ExcelChecklist.guardarYCompartirExcel(contexto, lista, categorias) },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("📊 Exportar Excel Checklist")
+            }
+        }
+
+        OutlinedTextField(
+            value = busquedaFolio,
+            onValueChange = { busquedaFolio = it },
+            label = { Text("Escanear o buscar por Folio, Equipo o Robot") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Opcion("Todas", categoria == null) { categoria = null }
@@ -397,14 +450,24 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
         }
         mensaje?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-        if (lista.isEmpty()) {
+        if (listaFiltrada.isEmpty()) {
             Text("No hay equipos con ese filtro.")
         }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(lista, key = { it.id }) { e ->
+            items(listaFiltrada, key = { it.id }) { e ->
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("${e.folio} · ${e.nombre}", style = MaterialTheme.typography.titleMedium)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text("${e.folio} · ${e.nombre}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            if (e.asistencia) {
+                                Text("✓ LLEGÓ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            } else {
+                                Text("PENDIENTE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+                            }
+                        }
                         Text("Capitán: ${e.capitan} · ${e.plantel}")
                         if (e.integrantes.isNotEmpty()) {
                             Text("Participantes (${1 + e.integrantes.size}): ${(listOf(e.capitan) + e.integrantes).joinToString(", ")}")
@@ -413,7 +476,13 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                         Text("${Peso.formatearKg(e.robot.pesoG)} · ${e.robot.tamanoCm} cm")
                         FotoEquipo(registro, e.id)
                         Text("Estado: ${etiqueta(e.estado)}", style = MaterialTheme.typography.labelLarge)
+                        e.horaLlegada?.let {
+                            Text("Llegada registrada: ${formatoFecha.format(Instant.ofEpochMilli(it))}", style = MaterialTheme.typography.bodySmall)
+                        }
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { cambiarAsistencia(e) }) {
+                                Text(if (e.asistencia) "Marcar Ausente" else "✓ Marcar Llegada")
+                            }
                             if (e.estado != EstadoEquipo.ACEPTADO) Button(onClick = { cambiar(e, EstadoEquipo.ACEPTADO) }) { Text("Aceptar") }
                             if (e.estado != EstadoEquipo.REVISION) OutlinedButton(onClick = { cambiar(e, EstadoEquipo.REVISION) }) { Text("Revisión") }
                             if (e.estado != EstadoEquipo.RECHAZADO) OutlinedButton(onClick = { cambiar(e, EstadoEquipo.RECHAZADO) }) { Text("Rechazar") }

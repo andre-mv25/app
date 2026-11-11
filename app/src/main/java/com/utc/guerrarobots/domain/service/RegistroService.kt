@@ -257,6 +257,14 @@ class RegistroService(
         return Resultado.Ok(equipos.obtener(equipoId)!!)
     }
 
+    suspend fun marcarAsistencia(equipoId: Long, presente: Boolean): Resultado<Equipo> {
+        val e = equipos.obtener(equipoId) ?: return falla(Codigo.NO_ENCONTRADO, "No existe el equipo", "equipoId")
+        val hora = if (presente) System.currentTimeMillis() else null
+        equipos.registrarAsistencia(equipoId, presente, hora)
+        val actualizado = equipos.obtener(equipoId) ?: e
+        return Resultado.Ok(actualizado)
+    }
+
     /**
      * Cambia los límites técnicos de una categoría. No se revisan de nuevo los equipos que
      * ya se registraron: el admin puede mandarlos a revisión a mano.

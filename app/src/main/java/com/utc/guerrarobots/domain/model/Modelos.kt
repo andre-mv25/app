@@ -88,6 +88,8 @@ data class Equipo(
     val estado: EstadoEquipo = EstadoEquipo.PENDIENTE,
     val integrantes: List<String>,
     val robot: Robot,
+    val asistencia: Boolean = false,
+    val horaLlegada: Long? = null,
 )
 
 enum class Lado { A, B }
