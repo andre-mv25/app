@@ -14,6 +14,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
+import kotlinx.coroutines.withTimeoutOrNull
+
 class AppContainer(
     db: FirebaseFirestore,
     val inicioSesion: ProveedorInicioSesion,
@@ -52,18 +54,27 @@ class AppContainer(
 
     /** Se llama una vez al abrir la app, antes de mostrar pantallas. */
     suspend fun iniciar() {
-        pines.cargar()
-        val guardadas = catalogo.categorias().map { it.clave }.toSet()
-        CategoriasBase.porDefecto.filter { it.clave !in guardadas }.forEach { catalogo.guardarCategoria(it) }
-        // Se agregan los que falten, no solo cuando la lista está vacía: así todos los planteles se pueden elegir.
-        val plantelesGuardados = catalogo.planteles().map { Texto.normalizar(it.nombre) }.toSet()
-        PlantelesBase.todos
-            .filter { Texto.normalizar(it) !in plantelesGuardados }
-            .forEach { catalogo.agregarPlantel(it) }
-        if (catalogo.palabrasBloqueadas().isEmpty()) {
-            listOf("puto", "puta", "pendejo", "mierda", "verga", "chingar", "cabron", "culero")
-                .forEach { catalogo.agregarPalabraBloqueada(Texto.normalizar(it)) }
+        withTimeoutOrNull(6_000L) {
+            runCatching { pines.cargar() }
+            runCatching {
+                val guardadas = catalogo.categorias().map { it.clave }.toSet()
+                CategoriasBase.porDefecto.filter { it.clave !in guardadas }.forEach {
+                    runCatching { catalogo.guardarCategoria(it) }
+                }
+            }
+            runCatching {
+                val plantelesGuardados = catalogo.planteles().map { Texto.normalizar(it.nombre) }.toSet()
+                PlantelesBase.todos
+                    .filter { Texto.normalizar(it) !in plantelesGuardados }
+                    .forEach { runCatching { catalogo.agregarPlantel(it) } }
+            }
+            runCatching {
+                if (catalogo.palabrasBloqueadas().isEmpty()) {
+                    listOf("puto", "puta", "pendejo", "mierda", "verga", "chingar", "cabron", "culero")
+                        .forEach { runCatching { catalogo.agregarPalabraBloqueada(Texto.normalizar(it)) } }
+                }
+            }
+            runCatching { terminos.sembrar() }
         }
-        terminos.sembrar()
     }
 }

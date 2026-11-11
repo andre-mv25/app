@@ -338,6 +338,7 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
     var mensaje by remember { mutableStateOf<String?>(null) }
     var porEliminar by remember { mutableStateOf<Equipo?>(null) }
     var verQr by remember { mutableStateOf<Equipo?>(null) }
+    var mostrarEscanerQr by remember { mutableStateOf(false) }
     val nombres = categorias.associate { it.clave to it.nombre }
 
     LaunchedEffect(Unit) { categorias = registro.categorias() }
@@ -356,15 +357,6 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
         }
     }
 
-    verQr?.let { equipo ->
-        AlertDialog(
-            onDismissRequest = { verQr = null },
-            title = { Text("QR · ${equipo.folio}") },
-            text = { QrRegistro(equipo, nombres[equipo.robot.categoria] ?: equipo.robot.categoria.valor, tamano = 240.dp) },
-            confirmButton = { TextButton(onClick = { verQr = null }) { Text("Cerrar") } },
-        )
-    }
-
     fun cambiar(equipo: Equipo, nuevo: EstadoEquipo) {
         scope.launch {
             when (val r = registro.cambiarEstado(equipo.id, nuevo)) {
@@ -381,6 +373,19 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                 is Resultado.Falla -> mensaje = r.primero.mensaje
             }
         }
+    }
+
+    if (mostrarEscanerQr && esAdmin) {
+        EscanerQrAdminDialog(
+            esAdmin = true,
+            equipos = lista,
+            onRegistrarAsistencia = { equipo ->
+                if (!equipo.asistencia) {
+                    cambiarAsistencia(equipo)
+                }
+            },
+            onCerrar = { mostrarEscanerQr = false },
+        )
     }
 
     porEliminar?.let { equipo ->
@@ -429,6 +434,14 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                 modifier = Modifier.weight(1f),
             ) {
                 Text("📊 Exportar Excel Checklist")
+            }
+            if (esAdmin) {
+                Button(
+                    onClick = { mostrarEscanerQr = true },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("📷 Escanear QR (ADMIN)")
+                }
             }
         }
 
