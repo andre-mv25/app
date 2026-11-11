@@ -43,9 +43,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import android.content.Context
+import com.utc.guerrarobots.data.sheets.GoogleSheetsSync
 import com.utc.guerrarobots.domain.model.Acciones
 import com.utc.guerrarobots.domain.model.Categoria
 import com.utc.guerrarobots.domain.model.ClaveCategoria
@@ -155,6 +159,13 @@ fun AccesoScreen(
                 Opcion("Admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; error = null }
                 Opcion("Jurado", rol == Rol.JURADO) { rol = Rol.JURADO; error = null }
             }
+            if (rol == Rol.ADMIN) {
+                Text(
+                    "Ingresa tu PIN individual de 7 dígitos o el PIN general de administrador.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         OutlinedTextField(
             value = pin,
@@ -206,6 +217,7 @@ fun AccesoScreen(
 fun PanelScreen(
     rol: Rol,
     categorias: List<Categoria>,
+    adminNombre: String? = null,
     onEquipos: () -> Unit,
     onPinJurado: () -> Unit,
     onAuditoria: () -> Unit,
@@ -213,7 +225,10 @@ fun PanelScreen(
     onSalir: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(if (rol == Rol.ADMIN) "Panel del admin" else "Panel del jurado", style = MaterialTheme.typography.headlineSmall)
+        val titulo = if (rol == Rol.ADMIN) {
+            if (!adminNombre.isNullOrBlank()) "Panel del admin ($adminNombre)" else "Panel del admin"
+        } else "Panel del jurado"
+        Text(titulo, style = MaterialTheme.typography.headlineSmall)
         if (rol == Rol.ADMIN) {
             Button(onClick = onEquipos, modifier = Modifier.fillMaxWidth()) { Text("Equipos registrados") }
             OutlinedButton(onClick = onPinJurado, modifier = Modifier.fillMaxWidth()) { Text("PIN de acceso") }
@@ -326,7 +341,12 @@ private fun FotoEquipo(registro: RegistroService, equipoId: Long) {
 
 /** Lista de equipos con filtros y botones para aceptar, rechazar, marcar asistencia (Checklist) y exportar a Excel. */
 @Composable
-fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> Unit) {
+fun EquiposScreen(
+    registro: RegistroService,
+    esAdmin: Boolean,
+    adminNombre: String? = null,
+    onVolver: () -> Unit,
+) {
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var categoria by remember { mutableStateOf<ClaveCategoria?>(null) }
@@ -339,6 +359,7 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
     var porEliminar by remember { mutableStateOf<Equipo?>(null) }
     var verQr by remember { mutableStateOf<Equipo?>(null) }
     var mostrarEscanerQr by remember { mutableStateOf(false) }
+    var mostrarConfigSheets by remember { mutableStateOf(false) }
     val nombres = categorias.associate { it.clave to it.nombre }
 
     LaunchedEffect(Unit) { categorias = registro.categorias() }
@@ -368,8 +389,22 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
 
     fun cambiarAsistencia(equipo: Equipo) {
         scope.launch {
-            when (val r = registro.marcarAsistencia(equipo.id, !equipo.asistencia)) {
-                is Resultado.Ok -> { mensaje = null; version += 1 }
+            val nuevaAsistencia = !equipo.asistencia
+            val quien = if (nuevaAsistencia) adminNombre else null
+            when (val r = registro.marcarAsistencia(equipo.id, nuevaAsistencia, quien)) {
+                is Resultado.Ok -> {
+                    mensaje = null
+                    version += 1
+                    if (GoogleSheetsSync.estaConfigurado(contexto)) {
+                        GoogleSheetsSync.sincronizarAsistencia(
+                            context = contexto,
+                            folio = equipo.folio,
+                            asistencia = nuevaAsistencia,
+                            horaMs = System.currentTimeMillis(),
+                            adminNombre = quien,
+                        )
+                    }
+                }
                 is Resultado.Falla -> mensaje = r.primero.mensaje
             }
         }
@@ -413,6 +448,15 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
         )
     }
 
+    if (mostrarConfigSheets) {
+        ConfigurarGoogleSheetsDialog(
+            contexto = contexto,
+            equipos = lista,
+            categorias = categorias,
+            onCerrar = { mostrarConfigSheets = false },
+        )
+    }
+
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -433,15 +477,21 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                 onClick = { ExcelChecklist.guardarYCompartirExcel(contexto, lista, categorias) },
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Exportar Excel Checklist")
+                Text("Exportar Excel")
             }
             if (esAdmin) {
                 Button(
                     onClick = { mostrarEscanerQr = true },
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("Escanear QR (ADMIN)")
+                    Text("Escanear QR")
                 }
+            }
+            OutlinedButton(
+                onClick = { mostrarConfigSheets = true },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Google Sheets")
             }
         }
 
@@ -490,7 +540,8 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                         FotoEquipo(registro, e.id)
                         Text("Estado: ${etiqueta(e.estado)}", style = MaterialTheme.typography.labelLarge)
                         e.horaLlegada?.let {
-                            Text("Llegada registrada: ${formatoFecha.format(Instant.ofEpochMilli(it))}", style = MaterialTheme.typography.bodySmall)
+                            val quien = e.adminRegistro?.let { adm -> " · por $adm" } ?: ""
+                            Text("Llegada registrada: ${formatoFecha.format(Instant.ofEpochMilli(it))}$quien", style = MaterialTheme.typography.bodySmall)
                         }
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { cambiarAsistencia(e) }) {
@@ -586,4 +637,112 @@ fun AuditoriaScreen(servicio: AuditoriaService, onVolver: () -> Unit) {
         OutlinedButton(onClick = { version += 1 }, modifier = Modifier.fillMaxWidth()) { Text("Actualizar") }
         TextButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
     }
+}
+
+/** Diálogo para configurar el Webhook de Google Sheets y sincronizar en vivo. */
+@Composable
+fun ConfigurarGoogleSheetsDialog(
+    contexto: Context,
+    equipos: List<Equipo>,
+    categorias: List<Categoria>,
+    onCerrar: () -> Unit,
+) {
+    var webhookUrl by remember { mutableStateOf(GoogleSheetsSync.obtenerWebhookUrl(contexto)) }
+    var sheetUrl by remember { mutableStateOf(GoogleSheetsSync.obtenerSheetUrl(contexto)) }
+    var sincronizando by remember { mutableStateOf(false) }
+    var mensajeSincronizacion by remember { mutableStateOf<String?>(null) }
+    var esError by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboardManager.current
+
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text("Google Sheets Compartido en Vivo") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    "Conecta una hoja de cálculo para que las asistencias registradas por los administradores se sincronicen en vivo en la nube.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedTextField(
+                    value = webhookUrl,
+                    onValueChange = { webhookUrl = it },
+                    label = { Text("URL del Webhook (Apps Script)") },
+                    placeholder = { Text("https://script.google.com/macros/s/.../exec") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = sheetUrl,
+                    onValueChange = { sheetUrl = it },
+                    label = { Text("Enlace a la Hoja de Cálculo (Opcional)") },
+                    placeholder = { Text("https://docs.google.com/spreadsheets/d/...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                mensajeSincronizacion?.let {
+                    Text(
+                        it,
+                        color = if (esError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        enabled = !sincronizando && webhookUrl.isNotBlank(),
+                        onClick = {
+                            GoogleSheetsSync.guardarWebhookUrl(contexto, webhookUrl)
+                            GoogleSheetsSync.guardarSheetUrl(contexto, sheetUrl)
+                            sincronizando = true
+                            mensajeSincronizacion = "Sincronizando..."
+                            scope.launch {
+                                val (ok, msg) = GoogleSheetsSync.sincronizarTodo(contexto, equipos, categorias)
+                                sincronizando = false
+                                esError = !ok
+                                mensajeSincronizacion = msg
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(if (sincronizando) "Enviando..." else "Sincronizar Todo")
+                    }
+
+                    if (sheetUrl.isNotBlank() || webhookUrl.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = { GoogleSheetsSync.abrirGoogleSheet(contexto) },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Abrir Hoja")
+                        }
+                    }
+                }
+
+                TextButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(GoogleSheetsSync.CODIGO_APPS_SCRIPT))
+                        mensajeSincronizacion = "Código copiado. Pégalo en Extensiones > Apps Script de tu Google Sheet."
+                        esError = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Copiar Código para Google Apps Script")
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                GoogleSheetsSync.guardarWebhookUrl(contexto, webhookUrl)
+                GoogleSheetsSync.guardarSheetUrl(contexto, sheetUrl)
+                onCerrar()
+            }) { Text("Guardar y Cerrar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onCerrar) { Text("Cancelar") }
+        },
+    )
 }

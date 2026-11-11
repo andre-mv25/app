@@ -78,11 +78,12 @@ class EquipoMemoria : EquipoRepository {
         datos[id]?.let { datos[id] = it.copy(logoUri = logoUri) }
     }
 
-    override suspend fun registrarAsistencia(id: Long, presente: Boolean, horaMs: Long?) {
+    override suspend fun registrarAsistencia(id: Long, presente: Boolean, horaMs: Long?, adminNombre: String?) {
         datos[id]?.let {
             datos[id] = it.copy(
                 asistencia = presente,
                 horaLlegada = if (presente) (horaMs ?: System.currentTimeMillis()) else null,
+                adminRegistro = if (presente) adminNombre else null,
             )
         }
     }

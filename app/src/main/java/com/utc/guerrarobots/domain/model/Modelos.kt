@@ -90,6 +90,7 @@ data class Equipo(
     val robot: Robot,
     val asistencia: Boolean = false,
     val horaLlegada: Long? = null,
+    val adminRegistro: String? = null,
 )
 
 enum class Lado { A, B }
@@ -151,6 +152,34 @@ data class Intento(
 }
 
 enum class Rol { PARTICIPANTE, JURADO, ADMIN }
+
+/** Perfil individual de los administradores autorizados del torneo. */
+data class AdminPerfil(
+    val id: String,
+    val nombre: String,
+    val pin: String, // PIN de 7 dígitos individual
+)
+
+object AdminsLista {
+    val todos = listOf(
+        AdminPerfil("andre", "Andre", "1234567"),
+        AdminPerfil("alan", "Alan", "2345678"),
+        AdminPerfil("yosiamar", "Yosiamar", "3456789"),
+        AdminPerfil("osvaldo", "Osvaldo", "4567890"),
+        AdminPerfil("luis_angel", "Luis Angel", "5678901"),
+        AdminPerfil("sevastian", "Sevastian", "6789012"),
+        AdminPerfil("felipe", "Felipe", "7890123"),
+        AdminPerfil("monse", "Monse", "8901234"),
+        AdminPerfil("leo", "Leo", "9012345"),
+        AdminPerfil("diego", "Diego", "1122334"),
+    )
+
+    fun buscarPorPin(pin: String): AdminPerfil? =
+        todos.firstOrNull { it.pin == pin.trim() }
+
+    fun buscarPorNombre(nombre: String): AdminPerfil? =
+        todos.firstOrNull { it.nombre.equals(nombre.trim(), ignoreCase = true) }
+}
 
 /**
  * Parámetros generales del torneo. Lo propio de cada categoría (pistas, intentos, límites)

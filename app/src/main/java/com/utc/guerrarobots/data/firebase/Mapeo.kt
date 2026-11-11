@@ -18,7 +18,7 @@ object Mapeo {
         "estado" to e.estado.name, "integrantes" to e.integrantes,
         "robotNombre" to e.robot.nombre, "robotNombreNorm" to Texto.normalizar(e.robot.nombre),
         "robotCategoria" to e.robot.categoria.name, "robotPesoG" to e.robot.pesoG, "robotTamanoCm" to e.robot.tamanoCm,
-        "asistencia" to e.asistencia, "horaLlegada" to e.horaLlegada,
+        "asistencia" to e.asistencia, "horaLlegada" to e.horaLlegada, "adminRegistro" to e.adminRegistro,
     )
 
     fun aEquipo(m: Map<String, Any?>): Equipo = Equipo(
@@ -32,6 +32,7 @@ object Mapeo {
         ),
         asistencia = (m["asistencia"] as? Boolean) ?: false,
         horaLlegada = longOrNull(m, "horaLlegada"),
+        adminRegistro = strOrNull(m, "adminRegistro"),
     )
 
     fun aMapa(p: Partida): Map<String, Any?> = mapOf(

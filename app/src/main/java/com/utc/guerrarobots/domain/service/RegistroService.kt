@@ -257,10 +257,10 @@ class RegistroService(
         return Resultado.Ok(equipos.obtener(equipoId)!!)
     }
 
-    suspend fun marcarAsistencia(equipoId: Long, presente: Boolean): Resultado<Equipo> {
+    suspend fun marcarAsistencia(equipoId: Long, presente: Boolean, adminNombre: String? = null): Resultado<Equipo> {
         val e = equipos.obtener(equipoId) ?: return falla(Codigo.NO_ENCONTRADO, "No existe el equipo", "equipoId")
         val hora = if (presente) System.currentTimeMillis() else null
-        equipos.registrarAsistencia(equipoId, presente, hora)
+        equipos.registrarAsistencia(equipoId, presente, hora, adminNombre)
         val actualizado = equipos.obtener(equipoId) ?: e
         return Resultado.Ok(actualizado)
     }

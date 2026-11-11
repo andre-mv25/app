@@ -223,13 +223,19 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             Pantalla.Panel -> PanelScreen(
                 rol = rol,
                 categorias = categorias,
+                adminNombre = if (rol == Rol.ADMIN) contenedor.acceso.nombreAdminActual else null,
                 onEquipos = { pantalla = Pantalla.Equipos },
                 onPinJurado = { pantalla = Pantalla.PinJurado },
                 onAuditoria = { pantalla = Pantalla.Auditoria },
                 onCategoria = { pantalla = if (it.metodo == Metodo.LLAVES) Pantalla.Llaves(it) else Pantalla.Tiempos(it) },
                 onSalir = { cerrarSesion() },
             )
-            Pantalla.Equipos -> EquiposScreen(contenedor.registro, esAdmin = rol == Rol.ADMIN, onVolver = { pantalla = Pantalla.Panel })
+            Pantalla.Equipos -> EquiposScreen(
+                registro = contenedor.registro,
+                esAdmin = rol == Rol.ADMIN,
+                adminNombre = if (rol == Rol.ADMIN) contenedor.acceso.nombreAdminActual else null,
+                onVolver = { pantalla = Pantalla.Panel },
+            )
             Pantalla.PinJurado -> PinJuradoScreen(contenedor.acceso, contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
             Pantalla.Auditoria -> AuditoriaScreen(contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
             is Pantalla.Llaves -> LlavesScreen(

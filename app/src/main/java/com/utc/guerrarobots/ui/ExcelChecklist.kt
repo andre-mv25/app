@@ -31,7 +31,7 @@ object ExcelChecklist {
 
     /**
      * Genera un archivo HTML Spreadsheet (.xls) con diseño profesional, colores,
-     * columnas independientes A-L, encabezados destacados y ordenamiento claro.
+     * columnas independientes A-M, encabezados destacados y el Administrador que registró cada cambio.
      */
     fun generarExcelHtml(equipos: List<Equipo>, categorias: List<Categoria>): String {
         val nombresCat = categorias.associate { it.clave to it.nombre }
@@ -59,6 +59,7 @@ object ExcelChecklist {
                 .aceptado { color: #276749; font-weight: bold; }
                 .revision { color: #DD6B20; font-weight: bold; }
                 .rechazado { color: #E53E3E; font-weight: bold; }
+                .admin { color: #2C5282; font-weight: bold; text-align: center; }
             </style>
             </head>
             <body>
@@ -78,6 +79,7 @@ object ExcelChecklist {
                   <th>Estado Registro</th>
                   <th>Asistencia (Checklist)</th>
                   <th>Hora de Llegada</th>
+                  <th>Registrado por (Admin)</th>
                   <th>Contenido QR</th>
                 </tr>
               </thead>
@@ -100,6 +102,7 @@ object ExcelChecklist {
                 "PENDIENTE" to "pendiente"
             }
             val horaLlegadaTxt = e.horaLlegada?.let { formatoFecha.format(Instant.ofEpochMilli(it)) } ?: "-"
+            val adminTxt = e.adminRegistro ?: "-"
             val qrTexto = CodigoRegistro.texto(e, nombreCat).replace("\n", " | ")
 
             sb.append(
@@ -116,6 +119,7 @@ object ExcelChecklist {
                   <td class="center $estadoClase">${htmlEscape(estadoTxt)}</td>
                   <td class="$asistenciaClase">${htmlEscape(asistenciaTxt)}</td>
                   <td class="center">${htmlEscape(horaLlegadaTxt)}</td>
+                  <td class="admin">${htmlEscape(adminTxt)}</td>
                   <td>${htmlEscape(qrTexto)}</td>
                 </tr>
                 """.trimIndent(),
@@ -143,11 +147,10 @@ object ExcelChecklist {
         val equiposOrdenados = ordenarEquipos(equipos, categorias)
         val sb = StringBuilder()
 
-        // Instrucción para Excel para forzar el separador de listas ";"
         sb.append("sep=;\n")
         sb.append("\uFEFF") // BOM UTF-8
 
-        sb.append("No.;Folio;Nombre Equipo;Robot;Categoría;Plantel;Capitán;Integrantes;Estado Registro;Asistencia (Checklist);Hora de Llegada;Contenido QR\n")
+        sb.append("No.;Folio;Nombre Equipo;Robot;Categoría;Plantel;Capitán;Integrantes;Estado Registro;Asistencia (Checklist);Hora de Llegada;Registrado por (Admin);Contenido QR\n")
 
         equiposOrdenados.forEachIndexed { i, e ->
             val nombreCat = nombresCat[e.robot.categoria] ?: e.robot.categoria.valor
@@ -160,6 +163,7 @@ object ExcelChecklist {
             }
             val asistenciaTxt = if (e.asistencia) "LLEGÓ (Presente)" else "PENDIENTE"
             val horaLlegadaTxt = e.horaLlegada?.let { formatoFecha.format(Instant.ofEpochMilli(it)) } ?: "-"
+            val adminTxt = e.adminRegistro ?: "-"
             val qrTexto = CodigoRegistro.texto(e, nombreCat).replace("\n", " | ").replace("\"", "\"\"")
 
             sb.append("${i + 1};")
@@ -173,6 +177,7 @@ object ExcelChecklist {
             sb.append("\"${csvEscape(estadoTxt)}\";")
             sb.append("\"${csvEscape(asistenciaTxt)}\";")
             sb.append("\"${csvEscape(horaLlegadaTxt)}\";")
+            sb.append("\"${csvEscape(adminTxt)}\";")
             sb.append("\"${qrTexto}\"\n")
         }
 

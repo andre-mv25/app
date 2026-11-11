@@ -19,6 +19,10 @@ class AccesoService(private val store: PinStore) {
     var rolActual: Rol = Rol.PARTICIPANTE
         private set
 
+    /** Nombre del administrador con sesión activa. */
+    var nombreAdminActual: String? = null
+        private set
+
     /** Quién inició sesión con Google, o null si entró con PIN o es participante. */
     var usuarioActual: Usuario? = null
         private set
@@ -27,10 +31,24 @@ class AccesoService(private val store: PinStore) {
     fun entrarComo(usuario: Usuario, rol: Rol) {
         usuarioActual = usuario
         rolActual = rol
+        if (rol == Rol.ADMIN && nombreAdminActual == null) {
+            nombreAdminActual = usuario.nombre?.ifBlank { "Admin Google" } ?: "Admin Google"
+        }
+    }
+
+    /** Entra como un administrador de la lista oficial usando su PIN de 7 dígitos. */
+    fun entrarComoAdmin(admin: com.utc.guerrarobots.domain.model.AdminPerfil, pin: String): Boolean {
+        if (admin.pin == pin.trim()) {
+            usuarioActual = null
+            rolActual = Rol.ADMIN
+            nombreAdminActual = admin.nombre
+            return true
+        }
+        return false
     }
 
     /** El admin y el jurado tienen cada uno su PIN. Dice si el de [rol] ya está definido. */
-    fun pinConfigurado(rol: Rol = Rol.ADMIN): Boolean = store.obtenerHash(rol) != null
+    fun pinConfigurado(rol: Rol = Rol.ADMIN): Boolean = store.obtenerHash(rol) != null || rol == Rol.ADMIN
 
     /**
      * Define o cambia el PIN de [rol] (ADMIN o JURADO). Los dos PIN deben ser distintos. El primer
@@ -62,18 +80,34 @@ class AccesoService(private val store: PinStore) {
         if (rol == Rol.PARTICIPANTE) {
             usuarioActual = null
             rolActual = Rol.PARTICIPANTE
+            nombreAdminActual = null
             return true
         }
-        val guardado = store.obtenerHash(rol) ?: return false
-        if (!verificar(pin, guardado)) return false
-        usuarioActual = null
-        rolActual = rol
-        return true
+        if (rol == Rol.ADMIN) {
+            val adminEncontrado = com.utc.guerrarobots.domain.model.AdminsLista.buscarPorPin(pin)
+            if (adminEncontrado != null) {
+                usuarioActual = null
+                rolActual = Rol.ADMIN
+                nombreAdminActual = adminEncontrado.nombre
+                return true
+            }
+        }
+        val guardado = store.obtenerHash(rol)
+        if (guardado != null && verificar(pin, guardado)) {
+            usuarioActual = null
+            rolActual = rol
+            if (rol == Rol.ADMIN && nombreAdminActual == null) {
+                nombreAdminActual = "Admin General"
+            }
+            return true
+        }
+        return false
     }
 
     fun salir() {
         usuarioActual = null
         rolActual = Rol.PARTICIPANTE
+        nombreAdminActual = null
     }
 
     /** El admin puede todo; el jurado puede lo del jurado y lo del participante. */

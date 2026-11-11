@@ -113,11 +113,12 @@ class EquipoFirestore(db: FirebaseFirestore, private val contadores: Contadores)
         col.document(id.toString()).update("logoUri", logoUri).await()
     }
 
-    override suspend fun registrarAsistencia(id: Long, presente: Boolean, horaMs: Long?) {
+    override suspend fun registrarAsistencia(id: Long, presente: Boolean, horaMs: Long?, adminNombre: String?) {
         col.document(id.toString()).update(
             mapOf(
                 "asistencia" to presente,
                 "horaLlegada" to if (presente) (horaMs ?: System.currentTimeMillis()) else null,
+                "adminRegistro" to if (presente) adminNombre else null,
             ),
         ).await()
     }
