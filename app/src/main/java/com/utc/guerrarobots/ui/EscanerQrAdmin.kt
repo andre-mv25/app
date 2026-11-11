@@ -115,7 +115,7 @@ fun EscanerQrAdminDialog(
         onDismissRequest = onCerrar,
         title = {
             Text(
-                "📷 Escáner QR de Asistencia (ADMIN)",
+                "Escáner QR de Asistencia (ADMIN)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -140,7 +140,7 @@ fun EscanerQrAdminDialog(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(
-                                "✓ ¡ASISTENCIA REGISTRADA EN EXCEL!",
+                                "ASISTENCIA REGISTRADA EN EXCEL",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -158,7 +158,7 @@ fun EscanerQrAdminDialog(
                         onClick = { ultimoEscaneado = null },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("📷 Escanear siguiente equipo")
+                        Text("Escanear siguiente equipo")
                     }
                 } else if (tienePermisoCamara) {
                     Text(

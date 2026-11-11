@@ -433,14 +433,14 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                 onClick = { ExcelChecklist.guardarYCompartirExcel(contexto, lista, categorias) },
                 modifier = Modifier.weight(1f),
             ) {
-                Text("📊 Exportar Excel Checklist")
+                Text("Exportar Excel Checklist")
             }
             if (esAdmin) {
                 Button(
                     onClick = { mostrarEscanerQr = true },
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("📷 Escanear QR (ADMIN)")
+                    Text("Escanear QR (ADMIN)")
                 }
             }
         }
@@ -476,7 +476,7 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                         ) {
                             Text("${e.folio} · ${e.nombre}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                             if (e.asistencia) {
-                                Text("✓ LLEGÓ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                Text("LLEGÓ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                             } else {
                                 Text("PENDIENTE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
                             }
@@ -494,7 +494,7 @@ fun EquiposScreen(registro: RegistroService, esAdmin: Boolean, onVolver: () -> U
                         }
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { cambiarAsistencia(e) }) {
-                                Text(if (e.asistencia) "Marcar Ausente" else "✓ Marcar Llegada")
+                                Text(if (e.asistencia) "Marcar Ausente" else "Marcar Llegada")
                             }
                             if (e.estado != EstadoEquipo.ACEPTADO) Button(onClick = { cambiar(e, EstadoEquipo.ACEPTADO) }) { Text("Aceptar") }
                             if (e.estado != EstadoEquipo.REVISION) OutlinedButton(onClick = { cambiar(e, EstadoEquipo.REVISION) }) { Text("Revisión") }
