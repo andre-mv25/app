@@ -121,7 +121,11 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                 onComenzar = { pantalla = Pantalla.Categorias },
                 onPublico = { pantalla = Pantalla.Publico },
                 onAcceso = { pantalla = Pantalla.Acceso },
-                onMiCompetencia = { pantalla = Pantalla.Competidor("") },
+                onMiCompetencia = {
+                    val pref = contexto.getSharedPreferences("guerra_robots_prefs", android.content.Context.MODE_PRIVATE)
+                    val folioGuardado = pref.getString("ultimo_folio", "") ?: ""
+                    pantalla = Pantalla.Competidor(folioGuardado)
+                },
             )
             Pantalla.Publico -> PublicoScreen(
                 categorias = categorias,
@@ -131,6 +135,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             is Pantalla.Competidor -> PantallaCompetidor(
                 servicio = contenedor.consulta,
                 folioInicial = p.folio,
+                categorias = categorias,
                 onVolver = { pantalla = Pantalla.Inicio },
             )
             Pantalla.Categorias -> CategoriasScreen(
@@ -173,6 +178,10 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                             try {
                                 when (val r = contenedor.registro.registrar(solicitud)) {
                                     is Resultado.Ok -> {
+                                        contexto.getSharedPreferences("guerra_robots_prefs", android.content.Context.MODE_PRIVATE)
+                                            .edit()
+                                            .putString("ultimo_folio", r.valor.folio)
+                                            .apply()
                                         borrador = BorradorRegistro()
                                         erroresRegistro = emptyMap()
                                         pantalla = Pantalla.Listo(r.valor)
