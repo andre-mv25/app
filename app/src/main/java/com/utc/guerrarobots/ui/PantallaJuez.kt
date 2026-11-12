@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,7 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.utc.guerrarobots.data.sheets.GoogleSheetsSync
@@ -70,6 +75,9 @@ fun PantallaJuez(
     var esError by remember { mutableStateOf(false) }
     var sincronizando by remember { mutableStateOf(false) }
     var exportando by remember { mutableStateOf(false) }
+    var mostrarConfiguracion by remember { mutableStateOf(false) }
+    var webhookUrl by remember { mutableStateOf(GoogleSheetsSync.obtenerWebhookUrl(contexto)) }
+    var sheetUrl by remember { mutableStateOf(GoogleSheetsSync.obtenerSheetUrl(contexto)) }
 
     // Obtener datos para mostrar
     var categorias by remember { mutableStateOf<List<Categoria>>(emptyList()) }
@@ -185,6 +193,15 @@ fun PantallaJuez(
             ) {
                 if (sincronizando) Text("Sincronizando...") else Text("Google Sheets")
             }
+
+            OutlinedButton(
+                onClick = {
+                    mostrarConfiguracion = true
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Configurar Webhook")
+            }
         }
 
         mensaje?.let {
@@ -251,14 +268,92 @@ fun PantallaJuez(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        TextButton(
-            onClick = onVolver,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Volver al Panel")
+            TextButton(
+                onClick = onVolver,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Volver al Panel")
+            }
+        }
+
+        // Diálogo de configuración del Webhook
+        if (mostrarConfiguracion) {
+            AlertDialog(
+                onDismissRequest = { mostrarConfiguracion = false },
+                title = { Text("Configurar Google Sheets") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            "Conecta una hoja de cálculo para sincronizar los datos en vivo en la nube.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        OutlinedTextField(
+                            value = webhookUrl,
+                            onValueChange = { webhookUrl = it },
+                            label = { Text("URL del Webhook (Apps Script)") },
+                            placeholder = { Text("https://script.google.com/macros/s/.../exec") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = sheetUrl,
+                            onValueChange = { sheetUrl = it },
+                            label = { Text("Enlace a la Hoja de Cálculo (Opcional)") },
+                            placeholder = { Text("https://docs.google.com/spreadsheets/d/...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Button(
+                                onClick = {
+                                    GoogleSheetsSync.guardarWebhookUrl(contexto, webhookUrl)
+                                    GoogleSheetsSync.guardarSheetUrl(contexto, sheetUrl)
+                                    mostrarConfiguracion = false
+                                },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("Guardar")
+                            }
+                            TextButton(
+                                onClick = { mostrarConfiguracion = false },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("Cancelar")
+                            }
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val clipboardManager = LocalClipboardManager.current
+                                    clipboardManager.setText(AnnotatedString(GoogleSheetsSync.CODIGO_APPS_SCRIPT))
+                                },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("Copiar Código Apps Script")
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {}) { Text("") }
+                },
+                dismissButton = {
+                    TextButton(onClick = {}) { Text("") }
+                },
+            )
         }
     }
-}
 
 /**
  * Obtiene el equipo ganador de una categoría basado en las partidas finalizadas o intentos válidos.
