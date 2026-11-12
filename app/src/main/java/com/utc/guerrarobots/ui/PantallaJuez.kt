@@ -6,21 +6,29 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.utc.guerrarobots.data.sheets.GoogleSheetsSync
 import com.utc.guerrarobots.domain.model.Categoria
@@ -63,8 +71,22 @@ fun PantallaJuez(
     var exportando by remember { mutableStateOf(false) }
 
     // Obtener datos para mostrar
-    val categorias = registro.categorias()
-    val equipos = registro.listar(EstadoEquipo.ACEPTADO, null)
+    var categorias by remember { mutableStateOf<List<Categoria>>(emptyList()) }
+    var equipos by remember { mutableStateOf<List<Equipo>>(emptyList()) }
+    var ganadores by remember { mutableStateOf<Map<ClaveCategoria, String>>(emptyMap()) }
+
+    LaunchedEffect(Unit) {
+        categorias = registro.categorias()
+        equipos = registro.listar(EstadoEquipo.ACEPTADO)
+        val mapa = mutableMapOf<ClaveCategoria, String>()
+        for (categoria in categorias) {
+            val ganador = obtenerGanadorCategoria(categoria, equipos, llaves, tiempos)
+            if (ganador != null) {
+                mapa[categoria.clave] = ganador
+            }
+        }
+        ganadores = mapa.toMap()
+    }
 
     Column(
         Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
@@ -78,7 +100,7 @@ fun PantallaJuez(
             Text(
                 "Mi Panel de Juez",
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = MaterialTheme.typography.fontWeightBold,
+                fontWeight = FontWeight.Bold,
             )
             Text(
                 "Juez: ${acceso.nombreActual ?: acceso.usuarioActual?.correo ?: "Desconocido"}",
@@ -102,15 +124,15 @@ fun PantallaJuez(
         Text(
             "Competencias y Resultados",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = MaterialTheme.typography.fontWeightBold,
+            fontWeight = FontWeight.Bold,
         )
 
         // Mostrar resumen por categoría
         categorias.forEach { categoria ->
-            val equipoGanador = obtenerGanadorCategoria(categoria, equipos, llaves, tiempos)
+            val equipoGanador = ganadores[categoria.clave]
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = 2.dp,
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             ) {
                 Column(
                     modifier = Modifier.padding(12.dp),
@@ -118,12 +140,12 @@ fun PantallaJuez(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spaceBetween,
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
                             "${categoria.nombre}",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = MaterialTheme.typography.fontWeightBold,
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
                             "${categoria.metodo.name}",
@@ -138,7 +160,7 @@ fun PantallaJuez(
                         Text(
                             "Ganador: ${equipoGanador ?: "Pendiente"}",
                             style = MaterialTheme.typography.bodySmall,
-                            fontWeight = MaterialTheme.typography.fontWeightBold,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                         )
                         Text(
@@ -195,11 +217,9 @@ fun PantallaJuez(
                     mensaje = null
                     scope.launch {
                         val (ok, msg) = GoogleSheetsSync.sincronizarTodo(
-                            contexto = contexto,
+                            context = contexto,
                             equipos = equipos,
                             categorias = categorias,
-                            partidas = llaves.partidasTodas(),
-                            intentos = tiempos.intentosTodas(),
                         )
                         sincronizando = false
                         mensaje = msg
@@ -207,7 +227,7 @@ fun PantallaJuez(
                     }
                 },
             ) {
-                if (sincronizando) Text("Sincronizando...") else Text("☁️ Google Sheets")
+                if (sincronizando) Text("Sincronizando...") else Text("Google Sheets")
             }
 
             if (!GoogleSheetsSync.estaConfigurado(contexto)) {
@@ -242,7 +262,7 @@ fun PantallaJuez(
 /**
  * Obtiene el equipo ganador de una categoría basado en las partidas finalizadas o intentos válidos.
  */
-private fun obtenerGanadorCategoria(
+private suspend fun obtenerGanadorCategoria(
     categoria: Categoria,
     equipos: List<Equipo>,
     llaves: LlavesService,
