@@ -170,7 +170,7 @@ object AdminsLista {
     val todos = listOf(
         AdminPerfil("jose_guadalupe", "Jose Guadalupe", "1234567"),
         AdminPerfil("delia_azucena", "Delia Azucena Lienzo", "7654321"),
-        AdminPerfil("andre", "Andre", "1234567"),
+        AdminPerfil("andre", "Andre", "1234568"),
         AdminPerfil("alan", "Alan", "2345678"),
         AdminPerfil("yosiamar", "Yosiamar", "3456789"),
         AdminPerfil("osvaldo", "Osvaldo", "4567890"),
