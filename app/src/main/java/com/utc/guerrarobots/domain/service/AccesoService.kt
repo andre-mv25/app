@@ -17,7 +17,7 @@ import java.security.SecureRandom
  * Acceso local por PIN. Cualquiera puede registrar su equipo (PARTICIPANTE); capturar
  * resultados exige el PIN del JURADO y configurar el torneo exige el del ADMIN.
  * Es una compuerta para la app, no seguridad de servidor: el PIN se guarda con sal y hash.
- * Cada admin y cada jurado tiene su PIN individual, asociado a su correo/identificador.
+ * Cada admin y cada jurado tiene su PIN individual, asociado a su identificador.
  */
 class AccesoService(private val store: PinStore) {
 
@@ -77,7 +77,7 @@ class AccesoService(private val store: PinStore) {
     }
 
     /**
-     * Entra como [rol] con [correo] y su PIN.
+     * Entra como [rol] con [pin].
      * Primero busca en las listas oficiales (AdminsLista / JuradosLista) por PIN;
      * si no encuentra, busca en PinStore por correo + rol.
      * Devuelve true si entró correctamente.
@@ -124,6 +124,11 @@ class AccesoService(private val store: PinStore) {
         }
 
         return false
+    }
+
+    /** Entra como [rol] con [pin] sin necesidad de correo (usa listas oficiales). */
+    fun entrarPorPin(rol: Rol, pin: String): Boolean {
+        return entrar("", rol, pin)
     }
 
     fun salir() {
