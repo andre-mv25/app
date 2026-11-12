@@ -10,6 +10,7 @@ import com.utc.guerrarobots.domain.repository.*
 import com.utc.guerrarobots.domain.rules.Texto
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
@@ -245,16 +246,15 @@ class AutorizacionFirestore(db: FirebaseFirestore) : AutorizacionRepository {
 class PinFirestore(db: FirebaseFirestore, private val scope: CoroutineScope) : PinStore {
     private val col = db.collection("gr_pines")
 
-    override suspend fun obtenerHash(correo: String, rol: Rol): String? {
-        val doc = col.document(correo).get().await().data
-        return doc?.get(rol.name) as? String
+    override fun obtenerHash(correo: String, rol: Rol): String? = runBlocking {
+        col.document(correo).get().await().data?.get(rol.name) as? String
     }
 
-    override suspend fun guardarHash(correo: String, rol: Rol, hash: String) {
+    override fun guardarHash(correo: String, rol: Rol, hash: String) = runBlocking {
         col.document(correo).set(mapOf(rol.name to hash), SetOptions.merge()).await()
     }
 
-    override suspend fun borrarHash(correo: String, rol: Rol) {
+    override fun borrarHash(correo: String, rol: Rol) = runBlocking {
         col.document(correo).update(mapOf(rol.name to com.google.firebase.firestore.FieldValue.delete())).await()
     }
 }

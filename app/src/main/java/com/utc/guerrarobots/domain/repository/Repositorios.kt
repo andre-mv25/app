@@ -83,9 +83,9 @@ interface IntentoRepository {
 
 /** Guarda el hash del PIN de cada persona por rol (correo + rol). */
 interface PinStore {
-    suspend fun obtenerHash(correo: String, rol: Rol): String?
-    suspend fun guardarHash(correo: String, rol: Rol, hash: String)
-    suspend fun borrarHash(correo: String, rol: Rol)
+    fun obtenerHash(correo: String, rol: Rol): String?
+    fun guardarHash(correo: String, rol: Rol, hash: String)
+    fun borrarHash(correo: String, rol: Rol)
 }
 
 /** Quién tiene la sesión ahora: el nombre que se anota en la bitácora. */

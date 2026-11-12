@@ -97,14 +97,14 @@ class EquipoMemoria : EquipoRepository {
 class PinMemoria : PinStore {
     private val pines = mutableMapOf<String, MutableMap<Rol, String>>()
 
-    override suspend fun obtenerHash(correo: String, rol: Rol): String? =
+    override fun obtenerHash(correo: String, rol: Rol): String? =
         pines[correo]?.get(rol)
 
-    override suspend fun guardarHash(correo: String, rol: Rol, hash: String) {
+    override fun guardarHash(correo: String, rol: Rol, hash: String) {
         pines.getOrPut(correo) { mutableMapOf() }[rol] = hash
     }
 
-    override suspend fun borrarHash(correo: String, rol: Rol) {
+    override fun borrarHash(correo: String, rol: Rol) {
         pines[correo]?.remove(rol)
     }
 }
