@@ -159,13 +159,11 @@ fun AccesoScreen(
                 Opcion("Admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; error = null }
                 Opcion("Jurado", rol == Rol.JURADO) { rol = Rol.JURADO; error = null }
             }
-            if (rol == Rol.ADMIN) {
-                Text(
-                    "Ingresa tu PIN individual de 7 dígitos o el PIN general de administrador.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                "Ingresa tu PIN individual de 7 dígitos para acceder.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         OutlinedTextField(
             value = pin,
@@ -225,9 +223,11 @@ fun PanelScreen(
     onSalir: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        val titulo = if (rol == Rol.ADMIN) {
-            if (!adminNombre.isNullOrBlank()) "Panel del admin ($adminNombre)" else "Panel del admin"
-        } else "Panel del jurado"
+        val titulo = when {
+            rol == Rol.ADMIN -> if (!adminNombre.isNullOrBlank()) "Panel del admin ($adminNombre)" else "Panel del admin"
+            rol == Rol.JURADO -> if (!adminNombre.isNullOrBlank()) "Panel del jurado ($adminNombre)" else "Panel del jurado"
+            else -> "Panel"
+        }
         Text(titulo, style = MaterialTheme.typography.headlineSmall)
         if (rol == Rol.ADMIN) {
             Button(onClick = onEquipos, modifier = Modifier.fillMaxWidth()) { Text("Equipos registrados") }

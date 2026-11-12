@@ -27,20 +27,22 @@ class AppContainer(
     private val contadores = Contadores(db)
 
     val catalogo = CatalogoFirestore(db, contadores)
-    private val equipos = EquipoFirestore(db, contadores)
-    private val partidas = PartidaFirestore(db, contadores)
-    private val sorteos = SorteoFirestore(db, contadores)
-    private val intentos = IntentoFirestore(db, contadores)
+    val equipos = EquipoFirestore(db, contadores)
+    val partidas = PartidaFirestore(db, contadores)
+    val sorteos = SorteoFirestore(db, contadores)
+    val intentos = IntentoFirestore(db, contadores)
     private val pines = PinFirestore(db, scope)
-    private val bitacora = AuditoriaFirestore(db, contadores)
+    val bitacora = AuditoriaFirestore(db, contadores)
     private val versionesTerminos = TerminosFirestore(db, contadores)
     private val autorizados = AutorizacionFirestore(db)
     private val fotos = FotoFirestore(db)
 
     val acceso = AccesoService(pines)
     val sesion = SesionService(autorizados, acceso)
-    /** En la bitácora se anota el correo de quien inició sesión con Google; con PIN, su rol. */
-    val auditoria = AuditoriaService(bitacora, reloj) { acceso.usuarioActual?.correo ?: acceso.rolActual.name }
+    /** En la bitácora se anota el nombre del admin/juez si entró con PIN, su correo si entró con Google, o su rol. */
+    val auditoria = AuditoriaService(bitacora, reloj) {
+        acceso.nombreAdminActual ?: acceso.usuarioActual?.correo ?: acceso.rolActual.name
+    }
     val terminos = TerminosService(versionesTerminos, reloj, auditoria)
     val registro = RegistroService(
         equipos, catalogo, partidas, tx, config, auditoria, terminos,

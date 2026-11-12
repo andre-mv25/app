@@ -223,7 +223,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             Pantalla.Panel -> PanelScreen(
                 rol = rol,
                 categorias = categorias,
-                adminNombre = if (rol == Rol.ADMIN) contenedor.acceso.nombreAdminActual else null,
+                adminNombre = contenedor.acceso.nombreAdminActual,
                 onEquipos = { pantalla = Pantalla.Equipos },
                 onPinJurado = { pantalla = Pantalla.PinJurado },
                 onAuditoria = { pantalla = Pantalla.Auditoria },

@@ -48,7 +48,7 @@ class AccesoService(private val store: PinStore) {
     }
 
     /** El admin y el jurado tienen cada uno su PIN. Dice si el de [rol] ya está definido. */
-    fun pinConfigurado(rol: Rol = Rol.ADMIN): Boolean = store.obtenerHash(rol) != null || rol == Rol.ADMIN
+    fun pinConfigurado(rol: Rol = Rol.ADMIN): Boolean = store.obtenerHash(rol) != null || rol == Rol.ADMIN || rol == Rol.JURADO
 
     /**
      * Define o cambia el PIN de [rol] (ADMIN o JURADO). Los dos PIN deben ser distintos. El primer
@@ -83,6 +83,8 @@ class AccesoService(private val store: PinStore) {
             nombreAdminActual = null
             return true
         }
+
+        // Si intenta entrar como ADMIN: solo los administradores autorizados (Jose Guadalupe y Delia Azucena)
         if (rol == Rol.ADMIN) {
             val adminEncontrado = com.utc.guerrarobots.domain.model.AdminsLista.buscarPorPin(pin)
             if (adminEncontrado != null) {
@@ -92,6 +94,25 @@ class AccesoService(private val store: PinStore) {
                 return true
             }
         }
+
+        // Si intenta entrar como JURADO: los administradores O los jurados de la lista oficial
+        if (rol == Rol.JURADO) {
+            val adminEncontrado = com.utc.guerrarobots.domain.model.AdminsLista.buscarPorPin(pin)
+            if (adminEncontrado != null) {
+                usuarioActual = null
+                rolActual = Rol.JURADO
+                nombreAdminActual = adminEncontrado.nombre
+                return true
+            }
+            val juradoEncontrado = com.utc.guerrarobots.domain.model.JuradosLista.buscarPorPin(pin)
+            if (juradoEncontrado != null) {
+                usuarioActual = null
+                rolActual = Rol.JURADO
+                nombreAdminActual = juradoEncontrado.nombre
+                return true
+            }
+        }
+
         val guardado = store.obtenerHash(rol)
         if (guardado != null && verificar(pin, guardado)) {
             usuarioActual = null

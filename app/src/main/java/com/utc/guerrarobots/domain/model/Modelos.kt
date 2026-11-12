@@ -153,8 +153,14 @@ data class Intento(
 
 enum class Rol { PARTICIPANTE, JURADO, ADMIN }
 
-/** Perfil individual de los administradores autorizados del torneo. */
+/** Perfil individual de los administradores y jurados autorizados del torneo. */
 data class AdminPerfil(
+    val id: String,
+    val nombre: String,
+    val pin: String, // PIN de 7 dígitos individual
+)
+
+data class JuradoPerfil(
     val id: String,
     val nombre: String,
     val pin: String, // PIN de 7 dígitos individual
@@ -162,22 +168,46 @@ data class AdminPerfil(
 
 object AdminsLista {
     val todos = listOf(
-        AdminPerfil("andre", "Andre", "1234567"),
-        AdminPerfil("alan", "Alan", "2345678"),
-        AdminPerfil("yosiamar", "Yosiamar", "3456789"),
-        AdminPerfil("osvaldo", "Osvaldo", "4567890"),
-        AdminPerfil("luis_angel", "Luis Angel", "5678901"),
-        AdminPerfil("sevastian", "Sevastian", "6789012"),
-        AdminPerfil("felipe", "Felipe", "7890123"),
-        AdminPerfil("monse", "Monse", "8901234"),
-        AdminPerfil("leo", "Leo", "9012345"),
-        AdminPerfil("diego", "Diego", "1122334"),
+        AdminPerfil("jose_guadalupe", "Jose Guadalupe", "1234567"),
+        AdminPerfil("delia_azucena", "Delia Azucena Lienzo", "7654321"),
     )
 
     fun buscarPorPin(pin: String): AdminPerfil? =
         todos.firstOrNull { it.pin == pin.trim() }
 
     fun buscarPorNombre(nombre: String): AdminPerfil? =
+        todos.firstOrNull { it.nombre.equals(nombre.trim(), ignoreCase = true) }
+}
+
+object JuradosLista {
+    val todos = listOf(
+        JuradoPerfil("francisco_javier", "Francisco Javier", "2100001"),
+        JuradoPerfil("ignacio_mendoza", "Ignacio Mendoza", "2100002"),
+        JuradoPerfil("gonzalo_ivan", "Gonzalo Iván Riego", "2100003"),
+        JuradoPerfil("maria_teresa", "María Teresa", "2100004"),
+        JuradoPerfil("rafael_ramirez", "Rafael Ramírez", "2100005"),
+        JuradoPerfil("karen_giselle", "Karen Giselle", "2100006"),
+        JuradoPerfil("samantha_mendoza", "Samantha Mendoza", "2100007"),
+        JuradoPerfil("cecilia_cabrioto", "Cecilia Alejandra Cabrioto Flores", "2100008"),
+        JuradoPerfil("alexis_javier", "Alexis Javier", "2100009"),
+        JuradoPerfil("adriana_perez", "Adriana Guadalupe Pérez", "2100010"),
+        JuradoPerfil("victor_oliva", "Víctor Manuel Oliva Sandoval", "2100011"),
+        JuradoPerfil("stefany_granados", "Stefany Granados Ñañez", "2100012"),
+        JuradoPerfil("rodolfo_marin", "Rodolfo Ángel Marín", "2100013"),
+        JuradoPerfil("tania_vazquez", "Tania Belén Vázquez", "2100014"),
+        JuradoPerfil("sandra_merida", "Sandra Aurora Mérida", "2100015"),
+        JuradoPerfil("julieta_gonzalez", "Julieta González Bravo", "2100016"),
+        JuradoPerfil("arizbeth_sanchez", "Arizbeth Sánchez", "2100017"),
+        JuradoPerfil("heriberto_sanchez", "Heriberto Arturo Sánchez", "2100018"),
+        JuradoPerfil("delfos_vazquez", "Delfos Bolívar Vázquez", "2100019"),
+        JuradoPerfil("jose_jesus", "José de Jesús Hernández García", "2100020"),
+        JuradoPerfil("alejandra_vega", "Alejandra Victoria Vega García", "2100021"),
+    )
+
+    fun buscarPorPin(pin: String): JuradoPerfil? =
+        todos.firstOrNull { it.pin == pin.trim() }
+
+    fun buscarPorNombre(nombre: String): JuradoPerfil? =
         todos.firstOrNull { it.nombre.equals(nombre.trim(), ignoreCase = true) }
 }
 

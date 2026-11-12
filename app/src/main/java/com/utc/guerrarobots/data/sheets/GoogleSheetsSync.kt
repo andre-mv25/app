@@ -32,6 +32,10 @@ object GoogleSheetsSync {
     const val URL_WEBHOOK_OFICIAL: String =
         "https://script.google.com/macros/s/AKfycbww_vmdfFPaOGDPdYEb9hVJvAscZXO1WFXg6XaVdjIBun6tBc-0AScpFTFMWrgjWZU/exec"
 
+    /** Enlace oficial directo a la Hoja de Cálculo en Google Sheets. */
+    const val URL_SHEET_OFICIAL: String =
+        "https://docs.google.com/spreadsheets/d/1b6IiTWJLhKpFH6-NytjueiP9UOClTMijr1FHKHwFseE/edit?gid=0#gid=0"
+
     private val formatoFecha = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(ZoneId.systemDefault())
 
     fun obtenerWebhookUrl(context: Context): String {
@@ -47,9 +51,11 @@ object GoogleSheetsSync {
             .apply()
     }
 
-    fun obtenerSheetUrl(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    fun obtenerSheetUrl(context: Context): String {
+        val guardada = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_SHEET_URL, "") ?: ""
+        return guardada.ifBlank { URL_SHEET_OFICIAL }
+    }
 
     fun guardarSheetUrl(context: Context, url: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
