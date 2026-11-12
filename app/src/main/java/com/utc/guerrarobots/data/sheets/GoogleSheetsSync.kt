@@ -32,7 +32,7 @@ object GoogleSheetsSync {
 
     /** URL oficial del Webhook de Google Sheets para el torneo. */
     const val URL_WEBHOOK_OFICIAL: String =
-        "https://script.google.com/macros/s/AKfycbww_vmdfFPaOGDPdYEb9hVJvAscZXO1WFXg6XaVdjIBun6tBc-0AScpFTFMWrgjWZU/exec"
+        "https://script.google.com/macros/s/AKfycbyEs7CmPw7NrpUpmGWkaHVBdH-YcUipIivowAzd3gOGBNzXGK25Dzs68KnihZgc1CED/exec"
 
     /** Enlace oficial directo a la Hoja de Cálculo en Google Sheets. */
     const val URL_SHEET_OFICIAL: String =
