@@ -245,6 +245,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
                 llaves = contenedor.llaves,
                 tiempos = contenedor.tiempos,
                 registro = contenedor.registro,
+                reportes = contenedor.reportes,
                 onVolver = { pantalla = Pantalla.Panel },
             )
             is Pantalla.Llaves -> LlavesScreen(
