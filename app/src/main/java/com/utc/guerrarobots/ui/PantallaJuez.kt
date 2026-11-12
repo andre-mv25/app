@@ -248,12 +248,6 @@ fun PantallaJuez(
                 }
             }
         }
-            Text(
-                it,
-                color = if (esError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
