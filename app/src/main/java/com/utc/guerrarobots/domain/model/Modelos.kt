@@ -246,6 +246,7 @@ data class EventoAuditoria(
     val entidadId: Long? = null,
     val detalle: String? = null,
     val creadoEn: Long,
+    val categoria: String? = null,
 )
 
 /** Nombres de las acciones que se guardan en la bitácora. */
@@ -266,6 +267,7 @@ object Acciones {
     const val PARTIDA_FINALIZADA = "PARTIDA_FINALIZADA"
     const val EQUIPO_ELIMINADO = "EQUIPO_ELIMINADO"
     const val PIN_CAMBIADO = "PIN_CAMBIADO"
+    const val SHEETS_SINCRONIZADO = "SHEETS_SINCRONIZADO"
 }
 
 /** Una versión publicada de los términos y condiciones. Cada cambio es una versión nueva (1, 2, 3...). */

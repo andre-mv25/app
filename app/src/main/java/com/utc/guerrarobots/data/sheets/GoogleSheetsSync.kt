@@ -6,6 +6,8 @@ import android.net.Uri
 import com.utc.guerrarobots.domain.model.Categoria
 import com.utc.guerrarobots.domain.model.Equipo
 import com.utc.guerrarobots.domain.rules.CodigoRegistro
+import com.utc.guerrarobots.domain.service.Hoja
+import com.utc.guerrarobots.domain.service.ReporteCategoria
 import com.utc.guerrarobots.ui.ExcelChecklist
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -167,6 +169,55 @@ object GoogleSheetsSync {
             val exito = enviarPost(webhookUrl, payload.toString())
             if (exito) {
                 true to "¡Google Sheets sincronizado con éxito (${ordenados.size} equipos)!"
+            } else {
+                false to "Error al comunicar con Google Sheets. Revisa la URL del Webhook."
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false to "Fallo de conexión: ${e.message}"
+        }
+    }
+
+    /**
+     * Sincroniza un reporte completo (múltiples pestañas) con Google Sheets.
+     */
+    suspend fun sincronizarReporte(
+        context: Context,
+        reporte: ReporteCategoria,
+    ): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val webhookUrl = obtenerWebhookUrl(context)
+        if (webhookUrl.isBlank()) {
+            return@withContext false to "Configura la URL del Webhook de Google Sheets en los ajustes."
+        }
+
+        try {
+            val hojasArray = JSONArray()
+            reporte.hojas.forEach { hoja ->
+                val filasArray = JSONArray()
+                hoja.filas.forEach { fila ->
+                    val filaObj = JSONObject()
+                    fila.forEachIndexed { index, valor ->
+                        filaObj.put("col$index", valor)
+                    }
+                    filasArray.put(filaObj)
+                }
+                hojasArray.put(
+                    JSONObject().apply {
+                        put("titulo", hoja.titulo)
+                        put("filas", filasArray)
+                    }
+                )
+            }
+
+            val payload = JSONObject().apply {
+                put("accion", "sincronizarReporte")
+                put("categoria", reporte.categoria.nombre)
+                put("hojas", hojasArray)
+            }
+
+            val exito = enviarPost(webhookUrl, payload.toString())
+            if (exito) {
+                true to "¡Reporte de ${reporte.categoria.nombre} sincronizado con éxito!"
             } else {
                 false to "Error al comunicar con Google Sheets. Revisa la URL del Webhook."
             }

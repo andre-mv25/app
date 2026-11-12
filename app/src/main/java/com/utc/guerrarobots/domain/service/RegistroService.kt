@@ -177,6 +177,7 @@ class RegistroService(
         auditoria?.registrar(
             Acciones.EQUIPO_REGISTRADO, "equipo", id,
             "${creado.folio} ${creado.nombre} · robot ${creado.robot.nombre} · ${limites.nombre}",
+            s.categoria,
         )
         return Resultado.Ok(creado)
     }
@@ -200,6 +201,7 @@ class RegistroService(
         auditoria?.registrar(
             Acciones.ESTADO_EQUIPO_CAMBIADO, "equipo", equipoId,
             "${equipo.folio} ${equipo.nombre}: ${equipo.estado.name} → ${nuevo.name}",
+            equipo.robot.categoria,
         )
         return Resultado.Ok(equipos.obtener(equipoId)!!)
     }
@@ -228,6 +230,7 @@ class RegistroService(
         auditoria?.registrar(
             Acciones.EQUIPO_ELIMINADO, "equipo", equipoId,
             "${equipo.folio} ${equipo.nombre} · robot ${equipo.robot.nombre} · ${categoria.valor}",
+            categoria,
         )
         Resultado.Ok(Unit)
     }
@@ -295,6 +298,7 @@ class RegistroService(
         auditoria?.registrar(
             Acciones.LIMITES_ACTUALIZADOS, "categoria", null,
             "${actualizada.nombre} · peso ${pesoMinG?.let { Peso.formatearKg(it) } ?: "-"} a ${pesoMaxG?.let { Peso.formatearKg(it) } ?: "-"} · tamaño máx. ${tamanoMaxCm ?: "-"} cm",
+            clave,
         )
         return Resultado.Ok(actualizada)
     }

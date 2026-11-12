@@ -52,6 +52,9 @@ class AppContainer(
     )
     val llaves = LlavesService(equipos, partidas, sorteos, catalogo, tx, reloj, auditoria)
     val tiempos = TiemposService(equipos, intentos, sorteos, catalogo, tx, reloj, config, auditoria)
+    val reportes = ReporteService(equipos, catalogo, intentos, partidas, bitacora, tiempos, llaves, reloj) {
+        acceso.usuarioActual?.correo ?: acceso.rolActual.name
+    }
     val consulta = ConsultaService(equipos, catalogo, llaves, tiempos)
 
     /** Se llama una vez al abrir la app, antes de mostrar pantallas. */

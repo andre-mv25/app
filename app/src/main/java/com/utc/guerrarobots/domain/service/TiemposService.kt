@@ -92,6 +92,7 @@ class TiemposService(
             auditoria?.registrar(
                 Acciones.ORDEN_SORTEADO, "categoria", null,
                 "${catalogo.categoria(categoria).nombre} · ${orden.size} equipos · semilla $usada",
+                categoria,
             )
             Resultado.Ok(orden)
         }
@@ -251,6 +252,7 @@ class TiemposService(
             if (esExtra) Acciones.CARRERA_EXTRA_REGISTRADA else Acciones.INTENTO_REGISTRADO,
             "intento", id,
             "${equipo.folio} ${equipo.nombre} · ${if (esExtra) "carrera extra" else "intento $numero"} · ${describir(intento)}",
+            intento.categoria,
         )
         return Resultado.Ok(intento.copy(id = id))
     }
@@ -289,6 +291,7 @@ class TiemposService(
             Acciones.INTENTO_ANULADO, "intento", intentoId,
             "${dueno?.folio.orEmpty()} ${dueno?.nombre ?: "equipo ${intento.equipoId}"} · " +
                 "${if (intento.numero > maxIntentos) "carrera extra" else "intento ${intento.numero}"} · ${describir(intento)}",
+            intento.categoria,
         )
         Resultado.Ok(Unit)
     }
@@ -357,7 +360,7 @@ class TiemposService(
         }
         val cerrada = catalogo.categoria(categoria).copy(cerrada = true)
         catalogo.guardarCategoria(cerrada)
-        auditoria?.registrar(Acciones.CATEGORIA_CERRADA, "categoria", null, cerrada.nombre)
+        auditoria?.registrar(Acciones.CATEGORIA_CERRADA, "categoria", null, cerrada.nombre, categoria)
         return Resultado.Ok(cerrada)
     }
 
@@ -366,7 +369,7 @@ class TiemposService(
         soloTiempo(categoria)?.let { return it }
         val abierta = catalogo.categoria(categoria).copy(cerrada = false)
         catalogo.guardarCategoria(abierta)
-        auditoria?.registrar(Acciones.CATEGORIA_REABIERTA, "categoria", null, abierta.nombre)
+        auditoria?.registrar(Acciones.CATEGORIA_REABIERTA, "categoria", null, abierta.nombre, categoria)
         return Resultado.Ok(abierta)
     }
 

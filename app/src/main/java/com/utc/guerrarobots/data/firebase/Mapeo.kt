@@ -82,11 +82,13 @@ object Mapeo {
     fun aMapa(e: EventoAuditoria): Map<String, Any?> = mapOf(
         "id" to e.id, "actor" to e.actor, "accion" to e.accion, "entidad" to e.entidad,
         "entidadId" to e.entidadId, "detalle" to e.detalle, "creadoEn" to e.creadoEn,
+        "categoria" to e.categoria,
     )
 
     fun aEvento(m: Map<String, Any?>): EventoAuditoria = EventoAuditoria(
         id = long(m, "id"), actor = str(m, "actor"), accion = str(m, "accion"), entidad = str(m, "entidad"),
         entidadId = longOrNull(m, "entidadId"), detalle = strOrNull(m, "detalle"), creadoEn = long(m, "creadoEn"),
+        categoria = strOrNull(m, "categoria"),
     )
 
     fun aMapa(t: Terminos): Map<String, Any?> = mapOf("version" to t.version, "reglas" to t.reglas, "publicadoEn" to t.publicadoEn)

@@ -133,6 +133,7 @@ class LlavesService(
         auditoria?.registrar(
             Acciones.LLAVES_GENERADAS, "categoria", null,
             "${info.nombre} · ${aceptados.size} equipos · sorteo ${if (tipo == TipoSorteo.MANUAL) "manual" else "aleatorio"}",
+            categoria,
         )
         return Resultado.Ok(cuadro(categoria))
     }
@@ -162,7 +163,7 @@ class LlavesService(
                 }
             }
         }
-        auditoria?.registrar(Acciones.LLAVES_PROGRAMADAS, "categoria", null, "${info.nombre} · ${canchas} canchas")
+        auditoria?.registrar(Acciones.LLAVES_PROGRAMADAS, "categoria", null, "${info.nombre} · ${canchas} canchas", categoria)
         return Resultado.Ok(cuadro(categoria))
     }
 
@@ -178,6 +179,7 @@ class LlavesService(
         partidas.actualizar(enCurso)
         auditoria?.registrar(
             Acciones.PARTIDA_INICIADA, "partida", p.id, "${nombre(p.equipoAId)} vs ${nombre(p.equipoBId)}",
+            p.categoria,
         )
         Resultado.Ok(enCurso)
     }
@@ -262,6 +264,7 @@ class LlavesService(
         auditoria?.registrar(
             Acciones.PARTIDA_FINALIZADA, "partida", p.id,
             (if (golesA != null && golesB != null) "$a $golesA - $golesB $b" else "$a vs $b") + " · ganó ${nombre(ganadorId)}",
+            p.categoria,
         )
 
         val siguienteId = p.siguientePartidaId
