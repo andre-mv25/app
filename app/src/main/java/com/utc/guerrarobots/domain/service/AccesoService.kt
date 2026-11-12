@@ -131,6 +131,11 @@ class AccesoService(private val store: PinStore) {
         return entrar("", rol, pin)
     }
 
+    /** Entra como [rol] con [pin] (método de compatibilidad). */
+    fun entrar(rol: Rol, pin: String): Boolean {
+        return entrar("", rol, pin)
+    }
+
     fun salir() {
         usuarioActual = null
         correoActual = null
