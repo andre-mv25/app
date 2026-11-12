@@ -57,7 +57,6 @@ class AppContainer(
     /** Se llama una vez al abrir la app, antes de mostrar pantallas. */
     suspend fun iniciar() {
         withTimeoutOrNull(6_000L) {
-            runCatching { pines.cargar() }
             runCatching {
                 val guardadas = catalogo.categorias().map { it.clave }.toSet()
                 CategoriasBase.porDefecto.filter { it.clave !in guardadas }.forEach {

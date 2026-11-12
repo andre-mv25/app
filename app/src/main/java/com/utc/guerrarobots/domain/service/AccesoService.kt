@@ -1,6 +1,10 @@
 package com.utc.guerrarobots.domain.service
 
+import com.utc.guerrarobots.domain.model.AdminPerfil
+import com.utc.guerrarobots.domain.model.AdminsLista
 import com.utc.guerrarobots.domain.model.Codigo
+import com.utc.guerrarobots.domain.model.JuradoPerfil
+import com.utc.guerrarobots.domain.model.JuradosLista
 import com.utc.guerrarobots.domain.model.Resultado
 import com.utc.guerrarobots.domain.model.Rol
 import com.utc.guerrarobots.domain.model.Usuario
@@ -13,14 +17,19 @@ import java.security.SecureRandom
  * Acceso local por PIN. Cualquiera puede registrar su equipo (PARTICIPANTE); capturar
  * resultados exige el PIN del JURADO y configurar el torneo exige el del ADMIN.
  * Es una compuerta para la app, no seguridad de servidor: el PIN se guarda con sal y hash.
+ * Cada admin y cada jurado tiene su PIN individual, asociado a su correo/identificador.
  */
 class AccesoService(private val store: PinStore) {
 
     var rolActual: Rol = Rol.PARTICIPANTE
         private set
 
-    /** Nombre del administrador con sesión activa. */
-    var nombreAdminActual: String? = null
+    /** Nombre del administrador o jurado con sesión activa. */
+    var nombreActual: String? = null
+        private set
+
+    /** Correo/identificador de la sesión activa. */
+    var correoActual: String? = null
         private set
 
     /** Quién inició sesión con Google, o null si entró con PIN o es participante. */
@@ -30,105 +39,98 @@ class AccesoService(private val store: PinStore) {
     /** Abre la sesión de alguien que ya se identificó (por ejemplo con Google) y tiene [rol]. */
     fun entrarComo(usuario: Usuario, rol: Rol) {
         usuarioActual = usuario
+        correoActual = usuario.correo
         rolActual = rol
-        if (rol == Rol.ADMIN && nombreAdminActual == null) {
-            nombreAdminActual = usuario.nombre?.ifBlank { "Admin Google" } ?: "Admin Google"
+        if (rol == Rol.ADMIN) {
+            nombreActual = usuario.nombre?.ifBlank { "Admin" } ?: "Admin"
+        } else if (rol == Rol.JURADO) {
+            nombreActual = usuario.nombre ?: "Jurado"
         }
     }
 
-    /** Entra como un administrador de la lista oficial usando su PIN de 7 dígitos. */
-    fun entrarComoAdmin(admin: com.utc.guerrarobots.domain.model.AdminPerfil, pin: String): Boolean {
-        if (admin.pin == pin.trim()) {
-            usuarioActual = null
-            rolActual = Rol.ADMIN
-            nombreAdminActual = admin.nombre
-            return true
-        }
-        return false
-    }
-
-    /** El admin y el jurado tienen cada uno su PIN. Dice si el de [rol] ya está definido. */
-    fun pinConfigurado(rol: Rol = Rol.ADMIN): Boolean = store.obtenerHash(rol) != null || rol == Rol.ADMIN || rol == Rol.JURADO
+    /** Dice si el [correo] ya tiene PIN definido para [rol]. */
+    fun pinConfigurado(correo: String, rol: Rol): Boolean = store.obtenerHash(correo, rol) != null
 
     /**
-     * Define o cambia el PIN de [rol] (ADMIN o JURADO). Los dos PIN deben ser distintos. El primer
-     * PIN del admin no pide sesión; todos los demás cambios los hace solo quien ya entró como admin
-     * (con Google o con su PIN). Si se perdió un PIN, el admin entra con Google y define uno nuevo.
+     * Define o cambia el PIN de [correo] para [rol] (ADMIN o JURADO). Los dos PIN deben ser
+     * distintos para una misma persona. El primer PIN no pide sesión; los demás cambios los hace
+     * solo quien ya entró como admin (con Google o con su PIN).
      */
-    fun configurarPin(pin: String, rol: Rol = Rol.ADMIN): Resultado<Unit> {
+    fun configurarPin(correo: String, rol: Rol, pin: String): Resultado<Unit> {
         if (rol != Rol.ADMIN && rol != Rol.JURADO) {
-            return falla(Codigo.VALIDACION, "Ese rol no usa PIN")
+            return falla(Codigo.VALIDACION, "Ese rol no usa PIN", "rol")
         }
         if (!pin.matches(Regex("\\d{4,8}"))) {
             return falla(Codigo.VALIDACION, "El PIN debe tener de 4 a 8 dígitos", "pin")
         }
-        val primerPinDelAdmin = rol == Rol.ADMIN && !pinConfigurado(Rol.ADMIN)
-        if (!primerPinDelAdmin && rolActual != Rol.ADMIN) {
-            return falla(Codigo.NO_PERMITIDO, "Solo el admin puede cambiar los PIN")
+        val esPrimeraVez = !pinConfigurado(correo, rol)
+        if (!esPrimeraVez && rolActual != Rol.ADMIN && correoActual != correo) {
+            return falla(Codigo.NO_PERMITIDO, "Solo el admin puede cambiar el PIN de otra persona")
         }
         val otro = if (rol == Rol.ADMIN) Rol.JURADO else Rol.ADMIN
-        val hashOtro = store.obtenerHash(otro)
+        val hashOtro = store.obtenerHash(correo, otro)
         if (hashOtro != null && verificar(pin, hashOtro)) {
-            return falla(Codigo.VALIDACION, "El PIN del admin y el del jurado deben ser distintos", "pin")
+            return falla(Codigo.VALIDACION, "El PIN de admin y el de jurado deben ser distintos", "pin")
         }
-        store.guardarHash(rol, crearHash(pin))
+        store.guardarHash(correo, rol, crearHash(pin))
         return Resultado.Ok(Unit)
     }
 
-    /** Entra como [rol] con su PIN. Devuelve false si ese rol no tiene PIN o no coincide. */
-    fun entrar(rol: Rol, pin: String): Boolean {
+    /**
+     * Entra como [rol] con [correo] y su PIN.
+     * Primero busca en las listas oficiales (AdminsLista / JuradosLista) por PIN;
+     * si no encuentra, busca en PinStore por correo + rol.
+     * Devuelve true si entró correctamente.
+     */
+    fun entrar(correo: String, rol: Rol, pin: String): Boolean {
         if (rol == Rol.PARTICIPANTE) {
             usuarioActual = null
+            correoActual = null
+            nombreActual = null
             rolActual = Rol.PARTICIPANTE
-            nombreAdminActual = null
             return true
         }
 
-        // Si intenta entrar como ADMIN: solo los administradores autorizados (Jose Guadalupe y Delia Azucena)
+        // Primero: buscar en listas oficiales por PIN (funciona sin correo)
         if (rol == Rol.ADMIN) {
-            val adminEncontrado = com.utc.guerrarobots.domain.model.AdminsLista.buscarPorPin(pin)
-            if (adminEncontrado != null) {
-                usuarioActual = null
+            val admin = AdminsLista.buscarPorPin(pin)
+            if (admin != null) {
+                usuarioActual = Usuario(admin.id, admin.nombre, admin.nombre)
+                correoActual = admin.id
+                nombreActual = admin.nombre
                 rolActual = Rol.ADMIN
-                nombreAdminActual = adminEncontrado.nombre
                 return true
             }
         }
-
-        // Si intenta entrar como JURADO: los administradores O los jurados de la lista oficial
         if (rol == Rol.JURADO) {
-            val adminEncontrado = com.utc.guerrarobots.domain.model.AdminsLista.buscarPorPin(pin)
-            if (adminEncontrado != null) {
-                usuarioActual = null
+            val jurado = JuradosLista.buscarPorPin(pin)
+            if (jurado != null) {
+                usuarioActual = Usuario(jurado.id, jurado.nombre, jurado.nombre)
+                correoActual = jurado.id
+                nombreActual = jurado.nombre
                 rolActual = Rol.JURADO
-                nombreAdminActual = adminEncontrado.nombre
-                return true
-            }
-            val juradoEncontrado = com.utc.guerrarobots.domain.model.JuradosLista.buscarPorPin(pin)
-            if (juradoEncontrado != null) {
-                usuarioActual = null
-                rolActual = Rol.JURADO
-                nombreAdminActual = juradoEncontrado.nombre
                 return true
             }
         }
 
-        val guardado = store.obtenerHash(rol)
+        // Segundo: buscar en PinStore por correo + rol
+        val guardado = store.obtenerHash(correo, rol)
         if (guardado != null && verificar(pin, guardado)) {
-            usuarioActual = null
+            usuarioActual = Usuario(correo, correo, correo)
+            correoActual = correo
+            nombreActual = correo
             rolActual = rol
-            if (rol == Rol.ADMIN && nombreAdminActual == null) {
-                nombreAdminActual = "Admin General"
-            }
             return true
         }
+
         return false
     }
 
     fun salir() {
         usuarioActual = null
+        correoActual = null
+        nombreActual = null
         rolActual = Rol.PARTICIPANTE
-        nombreAdminActual = null
     }
 
     /** El admin puede todo; el jurado puede lo del jurado y lo del participante. */

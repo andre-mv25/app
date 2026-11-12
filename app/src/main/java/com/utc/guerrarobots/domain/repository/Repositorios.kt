@@ -81,10 +81,11 @@ interface IntentoRepository {
     suspend fun eliminar(id: Long)
 }
 
-/** Guarda el hash del PIN de cada rol protegido (jurado y admin). */
+/** Guarda el hash del PIN de cada persona por rol (correo + rol). */
 interface PinStore {
-    fun obtenerHash(rol: Rol): String?
-    fun guardarHash(rol: Rol, hash: String)
+    fun obtenerHash(correo: String, rol: Rol): String?
+    fun guardarHash(correo: String, rol: Rol, hash: String)
+    fun borrarHash(correo: String, rol: Rol)
 }
 
 /** Quién tiene la sesión ahora: el nombre que se anota en la bitácora. */

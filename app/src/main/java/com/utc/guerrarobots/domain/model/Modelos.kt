@@ -170,6 +170,16 @@ object AdminsLista {
     val todos = listOf(
         AdminPerfil("jose_guadalupe", "Jose Guadalupe", "1234567"),
         AdminPerfil("delia_azucena", "Delia Azucena Lienzo", "7654321"),
+        AdminPerfil("andre", "Andre", "1234567"),
+        AdminPerfil("alan", "Alan", "2345678"),
+        AdminPerfil("yosiamar", "Yosiamar", "3456789"),
+        AdminPerfil("osvaldo", "Osvaldo", "4567890"),
+        AdminPerfil("luis_angel", "Luis Angel", "5678901"),
+        AdminPerfil("sevastian", "Sevastian", "6789012"),
+        AdminPerfil("felipe", "Felipe", "7890123"),
+        AdminPerfil("monse", "Monse", "8901234"),
+        AdminPerfil("leo", "Leo", "9012345"),
+        AdminPerfil("diego", "Diego", "1122334"),
     )
 
     fun buscarPorPin(pin: String): AdminPerfil? =

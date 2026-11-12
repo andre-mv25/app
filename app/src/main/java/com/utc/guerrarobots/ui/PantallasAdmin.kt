@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Divider
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -86,8 +87,9 @@ private fun etiqueta(estado: EstadoEquipo) = when (estado) {
 }
 
 /**
- * Entrada de jurado y admin: con Google (lo normal) o con el PIN de acceso, que es el mismo para
- * los dos. Si se perdió el PIN, el admin lo restablece entrando con Google.
+ * Entrada de jurado y admin: con Google (lo normal) o con el PIN de acceso individual.
+ * Cada admin y cada jurado tiene su propio PIN asociado a su correo/identificador.
+ * Si se perdió el PIN, el admin lo restablece entrando con Google.
  */
 @Composable
 fun AccesoScreen(
@@ -101,11 +103,14 @@ fun AccesoScreen(
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var rol by remember { mutableStateOf(Rol.ADMIN) }
+    var correo by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var errorGoogle by remember { mutableStateOf<String?>(null) }
     var abriendoGoogle by remember { mutableStateOf(false) }
-    val crearPin = !acceso.pinConfigurado(Rol.ADMIN)
+    val correoTrim = correo.trim()
+    val correoNoVacio = correoTrim.isNotEmpty()
+    val crearPin = correoNoVacio && !acceso.pinConfigurado(correoTrim, rol)
 
     /** Abre Google. Con [restablecer], solo deja pasar al admin y lo lleva a definir un PIN nuevo. */
     fun google(restablecer: Boolean) {
@@ -151,24 +156,31 @@ fun AccesoScreen(
         ) { Text(if (abriendoGoogle) "Abriendo Google..." else "Entrar con Google") }
         errorGoogle?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-        Text("O con el PIN de acceso", style = MaterialTheme.typography.labelLarge)
-        if (crearPin) {
-            Text("Todavía no hay PIN del admin. Crea el primero (de 4 a 8 dígitos). El PIN del jurado lo define después el admin.")
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Opcion("Admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; error = null }
-                Opcion("Jurado", rol == Rol.JURADO) { rol = Rol.JURADO; error = null }
-            }
+        Divider(modifier = Modifier.fillMaxWidth())
+
+        Text("O con tu PIN individual", style = MaterialTheme.typography.labelLarge)
+
+        OutlinedTextField(
+            value = correo,
+            onValueChange = { correo = it },
+            label = { Text("Correo o identificador") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        if (correoNoVacio) {
             Text(
-                "Ingresa tu PIN individual de 7 dígitos para acceder.",
+                "PIN de ${if (rol == Rol.ADMIN) "admin" else "jurado"} para ${correoTrim}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
         OutlinedTextField(
             value = pin,
             onValueChange = { pin = it },
-            label = { Text(if (crearPin) "Nuevo PIN" else "PIN") },
+            label = { Text("PIN (4 a 8 dígitos)") },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             singleLine = true,
@@ -180,27 +192,36 @@ fun AccesoScreen(
             },
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = {
-                if (crearPin) {
-                    when (val r = acceso.configurarPin(pin, rol)) {
-                        is Resultado.Ok -> {
-                            acceso.entrar(Rol.ADMIN, pin)
-                            onEntro(Rol.ADMIN)
-                        }
-                        is Resultado.Falla -> error = r.primero.mensaje
-                    }
-                } else if (acceso.entrar(rol, pin)) {
-                    onEntro(rol)
-                } else {
-                    error = if (acceso.pinConfigurado(rol)) "PIN incorrecto" else "El admin todavía no define el PIN del jurado"
-                }
-            },
-        ) { Text(if (crearPin) "Crear PIN y entrar como admin" else "Entrar con PIN") }
 
-        if (!crearPin) {
-            Text("¿Perdiste un PIN? El admin puede crear uno nuevo, para él o para el jurado, entrando con su cuenta de Google.", style = MaterialTheme.typography.bodySmall)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                enabled = correoNoVacio && pin.isNotEmpty(),
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    if (crearPin) {
+                        when (val r = acceso.configurarPin(correoTrim, rol, pin)) {
+                            is Resultado.Ok -> {
+                                acceso.entrarComo(Usuario(correoTrim, correoTrim, correoTrim), rol)
+                                onEntro(rol)
+                            }
+                            is Resultado.Falla -> error = r.primero.mensaje
+                        }
+                    } else if (acceso.entrar(correoTrim, rol, pin)) {
+                        onEntro(rol)
+                    } else {
+                        error = if (acceso.pinConfigurado(correoTrim, rol)) "PIN incorrecto" else "Este correo no tiene PIN de $rol definido"
+                    }
+                },
+            ) {
+                Text(if (crearPin) "Crear PIN y entrar" else "Entrar con PIN")
+            }
+        }
+
+        if (!crearPin && correoNoVacio) {
+            Text("¿Perdiste tu PIN? Pídele al admin que te cree uno nuevo, o entra con tu cuenta de Google.", style = MaterialTheme.typography.bodySmall)
             TextButton(
                 enabled = !abriendoGoogle,
                 onClick = { google(restablecer = true) },
@@ -242,15 +263,18 @@ fun PanelScreen(
     }
 }
 
-/** Cambiar el PIN del admin o el del jurado (deben ser distintos). Pide repetirlo para evitar errores de dedo. */
+/** Cambiar el PIN del admin o del jurado (deben ser distintos). Pide repetirlo para evitar errores de dedo. */
 @Composable
 fun PinJuradoScreen(acceso: AccesoService, auditoria: AuditoriaService, onVolver: () -> Unit) {
     val scope = rememberCoroutineScope()
     var rol by remember { mutableStateOf(Rol.ADMIN) }
+    var correo by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var repetir by remember { mutableStateOf("") }
     var mensaje by remember { mutableStateOf<String?>(null) }
     var esError by remember { mutableStateOf(false) }
+    val correoTrim = correo.trim()
+    val crearPin = correoTrim.isNotEmpty() && !acceso.pinConfigurado(correoTrim, rol)
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -262,8 +286,20 @@ fun PinJuradoScreen(acceso: AccesoService, auditoria: AuditoriaService, onVolver
             Opcion("PIN del admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; mensaje = null }
             Opcion("PIN del jurado", rol == Rol.JURADO) { rol = Rol.JURADO; mensaje = null }
         }
+        OutlinedTextField(
+            value = correo,
+            onValueChange = { correo = it },
+            label = { Text("Correo o identificador") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
         Text(
-            if (acceso.pinConfigurado(rol)) "Ya tiene PIN." else "Todavía no tiene PIN.",
+            if (correoTrim.isNotEmpty()) {
+                if (acceso.pinConfigurado(correoTrim, rol)) "Ya tiene PIN." else "Todavía no tiene PIN."
+            } else {
+                "Ingresa tu correo para continuar"
+            },
             style = MaterialTheme.typography.bodySmall,
         )
         OutlinedTextField(
@@ -288,14 +324,16 @@ fun PinJuradoScreen(acceso: AccesoService, auditoria: AuditoriaService, onVolver
         Button(
             modifier = Modifier.fillMaxWidth(),
             onClick = {
-                if (pin != repetir) {
+                if (correoTrim.isBlank()) {
+                    mensaje = "Ingresa tu correo"; esError = true
+                } else if (pin != repetir) {
                     mensaje = "Los dos PIN no coinciden"; esError = true
                 } else {
-                    when (val r = acceso.configurarPin(pin, rol)) {
+                    when (val r = acceso.configurarPin(correoTrim, rol, pin)) {
                         is Resultado.Ok -> {
                             val quien = if (rol == Rol.ADMIN) "del admin" else "del jurado"
                             mensaje = "PIN $quien guardado"; esError = false; pin = ""; repetir = ""
-                            scope.launch { auditoria.registrar(Acciones.PIN_CAMBIADO, "config", null, "PIN de acceso $quien") }
+                            scope.launch { auditoria.registrar(Acciones.PIN_CAMBIADO, "config", null, "PIN de acceso $quien de $correoTrim") }
                         }
                         is Resultado.Falla -> { mensaje = r.primero.mensaje; esError = true }
                     }

@@ -92,3 +92,18 @@ class EquipoMemoria : EquipoRepository {
         datos.remove(id)
     }
 }
+
+class PinMemoria : PinStore {
+    private val pines = mutableMapOf<String, MutableMap<Rol, String>>()
+
+    override fun obtenerHash(correo: String, rol: Rol): String? =
+        pines[correo]?.get(rol)
+
+    override fun guardarHash(correo: String, rol: Rol, hash: String) {
+        pines.getOrPut(correo) { mutableMapOf() }[rol] = hash
+    }
+
+    override fun borrarHash(correo: String, rol: Rol) {
+        pines[correo]?.remove(rol)
+    }
+}

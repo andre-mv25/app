@@ -241,22 +241,25 @@ class AutorizacionFirestore(db: FirebaseFirestore) : AutorizacionRepository {
             ?.let { nombre -> Rol.entries.firstOrNull { it.name == nombre } }
 }
 
-/** PIN en Firestore para que valgan en todos los teléfonos. Solo para la demo: se reemplaza por Google. */
+/** PIN en Firestore por persona y rol: colección "gr_pines", un documento por correo con campos por rol. */
 class PinFirestore(db: FirebaseFirestore, private val scope: CoroutineScope) : PinStore {
-    private val doc = db.collection("gr_config").document("pines")
-    private val cache = mutableMapOf<Rol, String>()
+    private val col = db.collection("gr_pines")
 
-    suspend fun cargar() {
-        doc.get().await().data?.forEach { (clave, valor) ->
-            runCatching { Rol.valueOf(clave) }.getOrNull()?.let { rol -> (valor as? String)?.let { cache[rol] = it } }
+    override suspend fun obtenerHash(correo: String, rol: Rol): String? {
+        val doc = col.document(correo).get().await().data
+        return doc?.get(rol.name) as? String
+    }
+
+    override fun guardarHash(correo: String, rol: Rol, hash: String) {
+        scope.launch {
+            col.document(correo).set(mapOf(rol.name to hash), SetOptions.merge()).await()
         }
     }
 
-    override fun obtenerHash(rol: Rol): String? = cache[rol]
-
-    override fun guardarHash(rol: Rol, hash: String) {
-        cache[rol] = hash
-        scope.launch { doc.set(mapOf(rol.name to hash), SetOptions.merge()).await() }
+    override fun borrarHash(correo: String, rol: Rol) {
+        scope.launch {
+            col.document(correo).update(mapOf(rol.name to com.google.firebase.firestore.FieldValue.delete())).await()
+        }
     }
 }
 
