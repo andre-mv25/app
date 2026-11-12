@@ -378,4 +378,13 @@ class TiemposService(
         }
         return Resultado.Ok(posiciones(categoria).filter { !it.fila.sinTiempo && it.fila.lugar <= 3 })
     }
+
+    /** Todos los intentos de todas las categorías. */
+    suspend fun intentosTodas(): List<Intento> {
+        val todas = mutableListOf<Intento>()
+        catalogo.categorias().forEach { categoria ->
+            todas.addAll(intentos.listar(categoria.clave))
+        }
+        return todas
+    }
 }

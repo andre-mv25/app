@@ -29,6 +29,7 @@ sealed interface Pantalla {
     data object Panel : Pantalla
     data object Equipos : Pantalla
     data object PinJurado : Pantalla
+    data object Juez : Pantalla
     data object Auditoria : Pantalla
     data class Tiempos(val categoria: Categoria) : Pantalla
     data class Llaves(val categoria: Categoria) : Pantalla
@@ -111,7 +112,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             is Pantalla.Registro -> pantalla = Pantalla.Categorias
             is Pantalla.Listo -> pantalla = Pantalla.Inicio
             Pantalla.Panel -> cerrarSesion()
-            Pantalla.Equipos, Pantalla.PinJurado, Pantalla.Auditoria, is Pantalla.Tiempos, is Pantalla.Llaves -> pantalla = Pantalla.Panel
+            Pantalla.Equipos, Pantalla.PinJurado, Pantalla.Auditoria, Pantalla.Juez, is Pantalla.Tiempos, is Pantalla.Llaves -> pantalla = Pantalla.Panel
         }
     }
 
@@ -238,6 +239,14 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             )
             Pantalla.PinJurado -> PinJuradoScreen(contenedor.acceso, contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
             Pantalla.Auditoria -> AuditoriaScreen(contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
+            Pantalla.Juez -> PantallaJuez(
+                acceso = contenedor.acceso,
+                auditoria = contenedor.auditoria,
+                llaves = contenedor.llaves,
+                tiempos = contenedor.tiempos,
+                registro = contenedor.registro,
+                onVolver = { pantalla = Pantalla.Panel },
+            )
             is Pantalla.Llaves -> LlavesScreen(
                 servicio = contenedor.llaves,
                 info = p.categoria,

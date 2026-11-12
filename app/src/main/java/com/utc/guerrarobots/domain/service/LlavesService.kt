@@ -308,4 +308,13 @@ class LlavesService(
         val rivalId = if (final.equipoAId == ganadorId) final.equipoBId else final.equipoAId
         return Podio(campeon, rivalId?.let { equipos.obtener(it) })
     }
+
+    /** Todas las partidas de todas las categorías. */
+    suspend fun partidasTodas(): List<Partida> {
+        val todas = mutableListOf<Partida>()
+        catalogo.categorias().forEach { categoria ->
+            todas.addAll(partidas.listar(categoria.clave))
+        }
+        return todas
+    }
 }
