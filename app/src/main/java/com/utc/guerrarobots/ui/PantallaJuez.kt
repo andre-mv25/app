@@ -268,12 +268,11 @@ fun PantallaJuez(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-            TextButton(
-                onClick = onVolver,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Volver al Panel")
-            }
+        TextButton(
+            onClick = onVolver,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Volver al Panel")
         }
 
         // Diálogo de configuración del Webhook
@@ -329,13 +328,14 @@ fun PantallaJuez(
                             }
                         }
 
+                        val clipboardManager = LocalClipboardManager.current
+
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             OutlinedButton(
                                 onClick = {
-                                    val clipboardManager = LocalClipboardManager.current
                                     clipboardManager.setText(AnnotatedString(GoogleSheetsSync.CODIGO_APPS_SCRIPT))
                                 },
                                 modifier = Modifier.weight(1f),
@@ -354,6 +354,8 @@ fun PantallaJuez(
             )
         }
     }
+
+}
 
 /**
  * Obtiene el equipo ganador de una categoría basado en las partidas finalizadas o intentos válidos.

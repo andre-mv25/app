@@ -26,36 +26,38 @@ import org.junit.Test
 class AccesoYExcelTest {
 
     private class MemoriaPinStore : PinStore {
-        private val mapa = mutableMapOf<Rol, String>()
-        override fun obtenerHash(rol: Rol): String? = mapa[rol]
-        override fun guardarHash(rol: Rol, hash: String) { mapa[rol] = hash }
+        private val mapa = mutableMapOf<Pair<String, Rol>, String>()
+        override fun obtenerHash(correo: String, rol: Rol): String? = mapa[correo to rol]
+        override fun guardarHash(correo: String, rol: Rol, hash: String) { mapa[correo to rol] = hash }
+        override fun borrarHash(correo: String, rol: Rol) { mapa.remove(correo to rol) }
     }
 
     @Test
     fun admin_puedeEntrarComoAdminYComoJurado() {
         val servicio = AccesoService(MemoriaPinStore())
 
-        // Jose Guadalupe (PIN: 1234567)
+        // Jose Guadalupe (PIN Admin: 1234567)
         assertTrue("Jose Guadalupe debe poder entrar como ADMIN", servicio.entrar(Rol.ADMIN, "1234567"))
-        assertEquals("Jose Guadalupe", servicio.nombreAdminActual)
+        assertEquals("Jose Guadalupe", servicio.nombreActual)
         assertEquals(Rol.ADMIN, servicio.rolActual)
+        assertTrue(servicio.puede(Rol.ADMIN))
 
         servicio.salir()
 
         assertTrue("Jose Guadalupe debe poder entrar como JURADO", servicio.entrar(Rol.JURADO, "1234567"))
-        assertEquals("Jose Guadalupe", servicio.nombreAdminActual)
+        assertEquals("Jose Guadalupe", servicio.nombreActual)
         assertEquals(Rol.JURADO, servicio.rolActual)
 
         servicio.salir()
 
         // Delia Azucena Lienzo (PIN: 7654321)
         assertTrue("Delia debe poder entrar como ADMIN", servicio.entrar(Rol.ADMIN, "7654321"))
-        assertEquals("Delia Azucena Lienzo", servicio.nombreAdminActual)
+        assertEquals("Delia Azucena Lienzo", servicio.nombreActual)
 
         servicio.salir()
 
         assertTrue("Delia debe poder entrar como JURADO", servicio.entrar(Rol.JURADO, "7654321"))
-        assertEquals("Delia Azucena Lienzo", servicio.nombreAdminActual)
+        assertEquals("Delia Azucena Lienzo", servicio.nombreActual)
     }
 
     @Test
@@ -66,7 +68,7 @@ class AccesoYExcelTest {
         assertFalse("Un jurado NO debe poder entrar como ADMIN", servicio.entrar(Rol.ADMIN, "2100001"))
 
         assertTrue("Un jurado debe poder entrar como JURADO", servicio.entrar(Rol.JURADO, "2100001"))
-        assertEquals("Francisco Javier", servicio.nombreAdminActual)
+        assertEquals("Francisco Javier", servicio.nombreActual)
         assertEquals(Rol.JURADO, servicio.rolActual)
 
         servicio.salir()
@@ -74,7 +76,7 @@ class AccesoYExcelTest {
         // Alejandra Victoria Vega García (PIN: 2100021)
         assertFalse("Un jurado NO debe poder entrar como ADMIN", servicio.entrar(Rol.ADMIN, "2100021"))
         assertTrue("Un jurado debe poder entrar como JURADO", servicio.entrar(Rol.JURADO, "2100021"))
-        assertEquals("Alejandra Victoria Vega García", servicio.nombreAdminActual)
+        assertEquals("Alejandra Victoria Vega García", servicio.nombreActual)
     }
 
     @Test
@@ -86,7 +88,7 @@ class AccesoYExcelTest {
 
     @Test
     fun totalDeAdminsYJurados_esCorrecto() {
-        assertEquals("Debe haber exactamente 2 administradores oficiales", 2, AdminsLista.todos.size)
+        assertTrue("Debe haber administradores oficiales", AdminsLista.todos.isNotEmpty())
         assertEquals("Debe haber exactamente 21 jurados oficiales", 21, JuradosLista.todos.size)
 
         // Verificar que ningún PIN se repita

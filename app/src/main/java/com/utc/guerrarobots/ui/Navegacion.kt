@@ -251,7 +251,8 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             is Pantalla.Llaves -> LlavesScreen(
                 servicio = contenedor.llaves,
                 info = p.categoria,
-                esAdmin = rol == Rol.ADMIN,
+                esAdmin = contenedor.acceso.puede(Rol.ADMIN),
+                esSuperAdmin = contenedor.acceso.puede(Rol.SUPER_ADMIN),
                 onVolver = { pantalla = Pantalla.Panel },
             )
             is Pantalla.Tiempos -> TiemposScreen(

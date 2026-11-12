@@ -92,6 +92,17 @@ class AccesoService(private val store: PinStore) {
         }
 
         // Primero: buscar en listas oficiales por PIN (funciona sin correo)
+        if (rol == Rol.SUPER_ADMIN) {
+            val admin = AdminsLista.buscarPorPinSuperAdmin(pin)
+            if (admin != null) {
+                usuarioActual = Usuario(admin.id, admin.nombre, admin.nombre)
+                correoActual = admin.id
+                nombreActual = admin.nombre
+                rolActual = Rol.SUPER_ADMIN
+                return true
+            }
+            return false
+        }
         if (rol == Rol.ADMIN) {
             val admin = AdminsLista.buscarPorPin(pin)
             if (admin != null) {
@@ -108,6 +119,14 @@ class AccesoService(private val store: PinStore) {
                 usuarioActual = Usuario(jurado.id, jurado.nombre, jurado.nombre)
                 correoActual = jurado.id
                 nombreActual = jurado.nombre
+                rolActual = Rol.JURADO
+                return true
+            }
+            val admin = AdminsLista.buscarPorPin(pin)
+            if (admin != null) {
+                usuarioActual = Usuario(admin.id, admin.nombre, admin.nombre)
+                correoActual = admin.id
+                nombreActual = admin.nombre
                 rolActual = Rol.JURADO
                 return true
             }

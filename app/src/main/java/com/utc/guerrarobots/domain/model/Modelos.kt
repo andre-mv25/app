@@ -151,14 +151,17 @@ data class Intento(
     val tiempoEfectivoMs: Long? get() = tiempoMs?.let { it + penalizacionMs }
 }
 
-enum class Rol { PARTICIPANTE, JURADO, ADMIN }
+enum class Rol { PARTICIPANTE, JURADO, ADMIN, SUPER_ADMIN }
 
 /** Perfil individual de los administradores y jurados autorizados del torneo. */
 data class AdminPerfil(
     val id: String,
     val nombre: String,
-    val pin: String, // PIN de 7 dígitos individual
-)
+    val pin: String, // PIN de 7 dígitos individual (Admin / Jurado)
+    val pinSuperAdmin: String? = null, // PIN de 7 dígitos exclusivo para Super Admin
+) {
+    val esSuperAdmin: Boolean get() = pinSuperAdmin != null
+}
 
 data class JuradoPerfil(
     val id: String,
@@ -168,7 +171,7 @@ data class JuradoPerfil(
 
 object AdminsLista {
     val todos = listOf(
-        AdminPerfil("jose_guadalupe", "Jose Guadalupe", "1234567"),
+        AdminPerfil("jose_guadalupe", "Jose Guadalupe", "1234567", pinSuperAdmin = "7777777"),
         AdminPerfil("delia_azucena", "Delia Azucena Lienzo", "7654321"),
         AdminPerfil("andre", "Andre", "1234568"),
         AdminPerfil("alan", "Alan", "2345678"),
@@ -184,6 +187,9 @@ object AdminsLista {
 
     fun buscarPorPin(pin: String): AdminPerfil? =
         todos.firstOrNull { it.pin == pin.trim() }
+
+    fun buscarPorPinSuperAdmin(pin: String): AdminPerfil? =
+        todos.firstOrNull { it.pinSuperAdmin != null && it.pinSuperAdmin == pin.trim() }
 
     fun buscarPorNombre(nombre: String): AdminPerfil? =
         todos.firstOrNull { it.nombre.equals(nombre.trim(), ignoreCase = true) }

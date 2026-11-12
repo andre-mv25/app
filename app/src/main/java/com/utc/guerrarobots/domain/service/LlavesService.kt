@@ -1,6 +1,7 @@
 package com.utc.guerrarobots.domain.service
 
 import com.utc.guerrarobots.domain.model.Acciones
+import com.utc.guerrarobots.domain.model.Categoria
 import com.utc.guerrarobots.domain.model.ClaveCategoria
 import com.utc.guerrarobots.domain.model.Codigo
 import com.utc.guerrarobots.domain.model.Equipo
@@ -82,12 +83,12 @@ class LlavesService(
         }
 
         val ids = aceptados.map { it.id }
+        val plantelDe = aceptados.associate { it.id to it.plantel }
         val (orden, semillaUsada) = when (tipo) {
             TipoSorteo.ALEATORIO -> {
                 val s = semilla ?: reloj.ahora()
                 val baraja = ids.sorted().shuffled(Random(s))
                 // En la primera ronda no se enfrentan equipos del mismo plantel (en lo posible).
-                val plantelDe = aceptados.associate { it.id to it.plantel }
                 Pair(Llaves.evitarMismoPlantel(baraja, plantelDe), s)
             }
             TipoSorteo.MANUAL -> {
@@ -98,12 +99,19 @@ class LlavesService(
                         "ordenManual",
                     )
                 }
+                val errorCruces = validarSinCrucesMismoPlantel(ordenManual, plantelDe)
+                if (errorCruces != null) {
+                    return falla(Codigo.VALIDACION, errorCruces, "ordenManual")
+                }
                 Pair(ordenManual, 0L)
             }
         }
 
         partidas.eliminarPorCategoria(categoria)
         sorteos.insertar(Sorteo(categoria = categoria, tipo = tipo, semilla = semillaUsada, creadoEn = reloj.ahora()))
+
+        // Al generar las llaves, el Super Admin cierra el registro de la categoría
+        catalogo.guardarCategoria(info.copy(cerrada = true))
 
         // Se guardan de la final hacia atrás para conocer el id de la partida a la que avanza cada una.
         val idPorLugar = mutableMapOf<Pair<Int, Int>, Long>()
@@ -319,5 +327,77 @@ class LlavesService(
             todas.addAll(partidas.listar(categoria.clave))
         }
         return todas
+    }
+
+    /** Cierra el registro de equipos para una categoría de llaves. */
+    suspend fun cerrarCategoria(categoria: ClaveCategoria): Resultado<Categoria> = tx.ejecutar {
+        val info = catalogo.categoria(categoria)
+        if (info.metodo != Metodo.LLAVES) {
+            return@ejecutar falla(Codigo.VALIDACION, "${info.nombre} no es categoría de llaves", "categoria")
+        }
+        val cerrada = info.copy(cerrada = true)
+        catalogo.guardarCategoria(cerrada)
+        auditoria?.registrar(Acciones.CATEGORIA_CERRADA, "categoria", null, cerrada.nombre, categoria)
+        Resultado.Ok(cerrada)
+    }
+
+    /**
+     * Valida que ningún cruce inicial enfrente a dos equipos del mismo plantel.
+     */
+    fun validarSinCrucesMismoPlantel(orden: List<Long>, plantelDe: Map<Long, String>): String? {
+        val n = orden.size
+        if (n < 2) return null
+        val tamano = Llaves.tamanoCuadro(n)
+        val semillas = Llaves.ordenSemillas(tamano)
+        for (i in 0 until tamano / 2) {
+            val idA = orden.getOrNull(semillas[2 * i] - 1)
+            val idB = orden.getOrNull(semillas[2 * i + 1] - 1)
+            if (idA != null && idB != null) {
+                val pA = plantelDe[idA]
+                val pB = plantelDe[idB]
+                if (pA != null && pA == pB) {
+                    return "No se pueden enfrentar dos equipos del mismo plantel ('$pA') en el mismo cruce de llaves"
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * Asignación manual por Super Admin: intercambia el orden inicial de dos equipos en la primera ronda.
+     */
+    suspend fun intercambiarEquiposManual(
+        categoria: ClaveCategoria,
+        equipoId1: Long,
+        equipoId2: Long,
+    ): Resultado<List<RondaVista>> = tx.ejecutar {
+        val info = catalogo.categoria(categoria)
+        if (info.metodo != Metodo.LLAVES) {
+            return@ejecutar falla(Codigo.VALIDACION, "${info.nombre} no es categoría de llaves", "categoria")
+        }
+        val jugadas = partidas.listar(categoria).any {
+            !it.esBye && (it.estado == EstadoPartida.EN_CURSO || it.estado == EstadoPartida.FINALIZADA)
+        }
+        if (jugadas) {
+            return@ejecutar falla(Codigo.CONFLICTO, "Ya hay partidos en curso o jugados: no se pueden modificar las llaves")
+        }
+        val aceptados = equipos.listar(EstadoEquipo.ACEPTADO, categoria)
+        val ids = aceptados.map { it.id }
+        val nuevoOrden = ids.toMutableList()
+        val idx1 = nuevoOrden.indexOf(equipoId1)
+        val idx2 = nuevoOrden.indexOf(equipoId2)
+        if (idx1 == -1 || idx2 == -1) {
+            return@ejecutar falla(Codigo.NO_ENCONTRADO, "Los equipos especificados no están en la lista de aceptados")
+        }
+        nuevoOrden[idx1] = equipoId2
+        nuevoOrden[idx2] = equipoId1
+
+        val plantelDe = aceptados.associate { it.id to it.plantel }
+        val errorCruces = validarSinCrucesMismoPlantel(nuevoOrden, plantelDe)
+        if (errorCruces != null) {
+            return@ejecutar falla(Codigo.VALIDACION, errorCruces, "ordenManual")
+        }
+
+        generarInterno(categoria, TipoSorteo.MANUAL, null, nuevoOrden)
     }
 }

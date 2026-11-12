@@ -64,6 +64,7 @@ fun LlavesScreen(
     servicio: LlavesService,
     info: Categoria,
     esAdmin: Boolean,
+    esSuperAdmin: Boolean = false,
     onVolver: () -> Unit,
 ) {
     val categoria = info.clave
@@ -98,7 +99,12 @@ fun LlavesScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(info.nombre, style = MaterialTheme.typography.headlineSmall)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(info.nombre, style = MaterialTheme.typography.headlineSmall)
+            if (esSuperAdmin) {
+                Text("Super Admin", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            }
+        }
         mensaje?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (cargando) Text("Cargando...")
 
@@ -112,10 +118,10 @@ fun LlavesScreen(
             }
         }
 
-        if (esAdmin) {
+        if (esAdmin || esSuperAdmin) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { ejecutar { servicio.generar(categoria) } }) {
-                    Text(if (rondas.isEmpty()) "Sortear llaves" else "Volver a sortear")
+                    Text(if (rondas.isEmpty()) "Sortear llaves (Super Admin)" else "Volver a sortear")
                 }
                 if (rondas.isNotEmpty()) {
                     OutlinedButton(onClick = { ejecutar { servicio.programar(categoria) } }) {
