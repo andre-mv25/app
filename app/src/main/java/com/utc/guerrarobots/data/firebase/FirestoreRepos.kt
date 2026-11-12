@@ -250,12 +250,16 @@ class PinFirestore(db: FirebaseFirestore, private val scope: CoroutineScope) : P
         col.document(correo).get().await().data?.get(rol.name) as? String
     }
 
-    override fun guardarHash(correo: String, rol: Rol, hash: String) = runBlocking {
-        col.document(correo).set(mapOf(rol.name to hash), SetOptions.merge()).await()
+    override fun guardarHash(correo: String, rol: Rol, hash: String) {
+        runBlocking {
+            col.document(correo).set(mapOf(rol.name to hash), SetOptions.merge()).await()
+        }
     }
 
-    override fun borrarHash(correo: String, rol: Rol) = runBlocking {
-        col.document(correo).update(mapOf(rol.name to com.google.firebase.firestore.FieldValue.delete())).await()
+    override fun borrarHash(correo: String, rol: Rol) {
+        runBlocking {
+            col.document(correo).update(mapOf(rol.name to com.google.firebase.firestore.FieldValue.delete())).await()
+        }
     }
 }
 
