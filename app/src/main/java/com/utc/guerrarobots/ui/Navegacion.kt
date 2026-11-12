@@ -223,7 +223,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             Pantalla.Panel -> PanelScreen(
                 rol = rol,
                 categorias = categorias,
-                adminNombre = contenedor.acceso.nombreAdminActual,
+                adminNombre = contenedor.acceso.nombreActual,
                 onEquipos = { pantalla = Pantalla.Equipos },
                 onPinJurado = { pantalla = Pantalla.PinJurado },
                 onAuditoria = { pantalla = Pantalla.Auditoria },
@@ -233,7 +233,7 @@ private fun NavegacionListo(contenedor: AppContainer, modifier: Modifier = Modif
             Pantalla.Equipos -> EquiposScreen(
                 registro = contenedor.registro,
                 esAdmin = rol == Rol.ADMIN,
-                adminNombre = if (rol == Rol.ADMIN) contenedor.acceso.nombreAdminActual else null,
+                adminNombre = if (rol == Rol.ADMIN) contenedor.acceso.nombreActual else null,
                 onVolver = { pantalla = Pantalla.Panel },
             )
             Pantalla.PinJurado -> PinJuradoScreen(contenedor.acceso, contenedor.auditoria, onVolver = { pantalla = Pantalla.Panel })
