@@ -11,14 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,7 +61,7 @@ fun PantallaJuez(
     llaves: LlavesService,
     tiempos: TiemposService,
     registro: RegistroService,
-    reportes: ReporteService? = null,
+    reportes: ReporteService,
     onVolver: () -> Unit,
 ) {
     val contexto = LocalContext.current
@@ -73,8 +70,6 @@ fun PantallaJuez(
     var esError by remember { mutableStateOf(false) }
     var sincronizando by remember { mutableStateOf(false) }
     var exportando by remember { mutableStateOf(false) }
-    var mostrarConfiguracion by remember { mutableStateOf(false) }
-    var urlWebhook by remember { mutableStateOf(GoogleSheetsSync.obtenerWebhookUrl(contexto)) }
 
     // Obtener datos para mostrar
     var categorias by remember { mutableStateOf<List<Categoria>>(emptyList()) }
@@ -216,78 +211,33 @@ fun PantallaJuez(
             }
 
             Button(
-                enabled = !sincronizando && GoogleSheetsSync.estaConfigurado(contexto),
+                enabled = !sincronizando,
                 modifier = Modifier.weight(1f),
                 onClick = {
                     sincronizando = true
                     mensaje = null
                     scope.launch {
-                        val (ok, msg) = GoogleSheetsSync.sincronizarTodo(
-                            context = contexto,
-                            equipos = equipos,
-                            categorias = categorias,
-                        )
-                        sincronizando = false
-                        mensaje = msg
-                        esError = !ok
+                        try {
+                            val todas = reportes.reporteTodas()
+                            var ok = true
+                            var msgs = mutableListOf<String>()
+                            for (reporte in todas) {
+                                val (exito, msg) = GoogleSheetsSync.sincronizarReporte(contexto, reporte)
+                                ok = ok && exito
+                                msgs.add(msg)
+                            }
+                            sincronizando = false
+                            mensaje = msgs.joinToString(" ")
+                            esError = !ok
+                        } catch (e: Exception) {
+                            sincronizando = false
+                            mensaje = "Error al sincronizar reporte: ${e.message}"
+                            esError = true
+                        }
                     }
                 },
             ) {
                 if (sincronizando) Text("Sincronizando...") else Text("Google Sheets")
-            }
-
-            if (reportes != null) {
-                Button(
-                    enabled = !sincronizando,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        sincronizando = true
-                        mensaje = null
-                        scope.launch {
-                            try {
-                                val todas = reportes!!.reporteTodas()
-                                var ok = true
-                                var msgs = mutableListOf<String>()
-                                for (reporte in todas) {
-                                    val (exito, msg) = GoogleSheetsSync.sincronizarReporte(contexto, reporte)
-                                    ok = ok && exito
-                                    msgs.add(msg)
-                                }
-                                sincronizando = false
-                                mensaje = msgs.joinToString(" ")
-                                esError = !ok
-                            } catch (e: Exception) {
-                                sincronizando = false
-                                mensaje = "Error al sincronizar reporte: ${e.message}"
-                                esError = true
-                            }
-                        }
-                    },
-                ) {
-                    if (sincronizando) Text("Sincronizando reporte...") else Text("Sincronizar Reporte")
-                }
-            }
-
-            if (!GoogleSheetsSync.estaConfigurado(contexto)) {
-                OutlinedButton(
-                    onClick = {
-                        urlWebhook = GoogleSheetsSync.obtenerWebhookUrl(contexto)
-                        mostrarConfiguracion = true
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Configurar Webhook")
-                }
-            } else {
-                OutlinedButton(
-                    onClick = {
-                        urlWebhook = GoogleSheetsSync.obtenerWebhookUrl(contexto)
-                        mostrarConfiguracion = true
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Cambiar Webhook")
-                }
             }
         }
 
@@ -307,40 +257,6 @@ fun PantallaJuez(
         ) {
             Text("Volver al Panel")
         }
-    }
-
-    // Diálogo de configuración del Webhook
-    if (mostrarConfiguracion) {
-        AlertDialog(
-            onDismissRequest = { mostrarConfiguracion = false },
-            title = { Text("Configurar Google Sheets") },
-            text = {
-                Column(Modifier.fillMaxWidth()) {
-                    Text("Pega la URL del Webhook de Google Apps Script:")
-                    OutlinedTextField(
-                        value = urlWebhook,
-                        onValueChange = { urlWebhook = it },
-                        label = { Text("URL del Webhook") },
-                        singleLine = false,
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        GoogleSheetsSync.guardarWebhookUrl(contexto, urlWebhook)
-                        mostrarConfiguracion = false
-                    }
-                ) { Text("Guardar") }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { mostrarConfiguracion = false }
-                ) { Text("Cancelar") }
-            },
-        )
     }
 }
 
