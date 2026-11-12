@@ -41,7 +41,7 @@ class AppContainer(
     val sesion = SesionService(autorizados, acceso)
     /** En la bitácora se anota el nombre del admin/juez si entró con PIN, su correo si entró con Google, o su rol. */
     val auditoria = AuditoriaService(bitacora, reloj) {
-        acceso.nombreAdminActual ?: acceso.usuarioActual?.correo ?: acceso.rolActual.name
+        acceso.nombreActual ?: acceso.usuarioActual?.correo ?: acceso.rolActual.name
     }
     val terminos = TerminosService(versionesTerminos, reloj, auditoria)
     val registro = RegistroService(
