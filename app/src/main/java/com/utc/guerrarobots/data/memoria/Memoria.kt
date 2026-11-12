@@ -10,6 +10,7 @@ import com.utc.guerrarobots.domain.model.Rol
 import com.utc.guerrarobots.domain.repository.EquipoRepository
 import com.utc.guerrarobots.domain.repository.AutorizacionRepository
 import com.utc.guerrarobots.domain.repository.AuditoriaRepository
+import com.utc.guerrarobots.domain.repository.PinStore
 import com.utc.guerrarobots.domain.repository.TerminosRepository
 
 class AuditoriaMemoria : AuditoriaRepository {
