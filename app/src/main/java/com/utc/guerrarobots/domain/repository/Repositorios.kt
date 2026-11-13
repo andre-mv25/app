@@ -116,3 +116,9 @@ interface AutorizacionRepository {
     /** El rol de ese correo (ya en minúsculas), o null si no está autorizado. */
     suspend fun rolDe(correo: String): Rol?
 }
+
+/** Configuración de la última versión disponible de la app. */
+interface ActualizacionRepository {
+    suspend fun obtenerConfiguracion(): com.utc.guerrarobots.domain.model.InfoActualizacion?
+    suspend fun guardarConfiguracion(info: com.utc.guerrarobots.domain.model.InfoActualizacion)
+}

@@ -56,6 +56,7 @@ class AppContainer(
         acceso.usuarioActual?.correo ?: acceso.rolActual.name
     }
     val consulta = ConsultaService(equipos, catalogo, llaves, tiempos)
+    val actualizacion = ActualizacionService(ActualizacionFirestore(db), auditoria)
 
     /** Se llama una vez al abrir la app, antes de mostrar pantallas. */
     suspend fun iniciar() {

@@ -28,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -214,6 +215,7 @@ fun PanelScreen(
     onEquipos: () -> Unit,
     onPinJurado: () -> Unit,
     onAuditoria: () -> Unit,
+    onActualizacion: () -> Unit = {},
     onCategoria: (Categoria) -> Unit,
     onSalir: () -> Unit,
 ) {
@@ -229,12 +231,121 @@ fun PanelScreen(
             Button(onClick = onEquipos, modifier = Modifier.fillMaxWidth()) { Text("Equipos registrados") }
             OutlinedButton(onClick = onPinJurado, modifier = Modifier.fillMaxWidth()) { Text("PIN de acceso") }
             OutlinedButton(onClick = onAuditoria, modifier = Modifier.fillMaxWidth()) { Text("Bitácora de cambios") }
+            OutlinedButton(onClick = onActualizacion, modifier = Modifier.fillMaxWidth()) { Text("Publicar actualización APK") }
         }
         categorias.forEach { c ->
             Button(onClick = { onCategoria(c) }, modifier = Modifier.fillMaxWidth()) { Text(c.nombre) }
         }
         Spacer(Modifier.weight(1f))
         TextButton(onClick = onSalir, modifier = Modifier.fillMaxWidth()) { Text("Cerrar sesión") }
+    }
+}
+
+/** Permite al Super Admin o Admin publicar una nueva versión disponible en Firebase Hosting. */
+@Composable
+fun PublicarActualizacionScreen(
+    servicio: com.utc.guerrarobots.domain.service.ActualizacionService,
+    onVolver: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var versionCodeText by remember { mutableStateOf("2") }
+    var versionName by remember { mutableStateOf("2.0") }
+    var urlDescarga by remember { mutableStateOf("") }
+    var novedades by remember { mutableStateOf("") }
+    var obligatoria by remember { mutableStateOf(false) }
+    var mensaje by remember { mutableStateOf<String?>(null) }
+    var esError by remember { mutableStateOf(false) }
+    var guardando by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val config = servicio.obtenerConfiguracion()
+        versionCodeText = config.versionCode.toString()
+        versionName = config.versionName
+        urlDescarga = config.urlDescarga
+        novedades = config.novedades
+        obligatoria = config.obligatoria
+    }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Publicar Actualización APK", style = MaterialTheme.typography.headlineSmall)
+        Text("Configura la versión disponible en Firebase Hosting para que la app se actualice sola.")
+
+        OutlinedTextField(
+            value = versionCodeText,
+            onValueChange = { versionCodeText = it },
+            label = { Text("versionCode (número, ej. 2)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        OutlinedTextField(
+            value = versionName,
+            onValueChange = { versionName = it },
+            label = { Text("versionName (ej. 2.0)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        OutlinedTextField(
+            value = urlDescarga,
+            onValueChange = { urlDescarga = it },
+            label = { Text("URL directa del APK en Firebase Hosting") },
+            placeholder = { Text("https://guerrarobots.web.app/releases/GuerraRobots-v2.apk") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        OutlinedTextField(
+            value = novedades,
+            onValueChange = { novedades = it },
+            label = { Text("Novedades de la versión") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Row(
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(checked = obligatoria, onCheckedChange = { obligatoria = it })
+            Text("Actualización obligatoria")
+        }
+
+        mensaje?.let { Text(it, color = if (esError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary) }
+
+        Button(
+            enabled = !guardando,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                val code = versionCodeText.toIntOrNull()
+                if (code == null || code < 1) {
+                    mensaje = "Ingresa un versionCode válido (entero mayor a 0)"; esError = true
+                    return@Button
+                }
+                guardando = true
+                scope.launch {
+                    val info = com.utc.guerrarobots.domain.model.InfoActualizacion(
+                        versionCode = code,
+                        versionName = versionName.ifBlank { "1.0" },
+                        urlDescarga = urlDescarga.trim(),
+                        obligatoria = obligatoria,
+                        novedades = novedades.trim(),
+                    )
+                    when (val r = servicio.guardarConfiguracion(info)) {
+                        is com.utc.guerrarobots.domain.model.Resultado.Ok -> { mensaje = "¡Actualización v$versionName ($code) publicada!"; esError = false }
+                        is com.utc.guerrarobots.domain.model.Resultado.Falla -> { mensaje = r.primero.mensaje; esError = true }
+                    }
+                    guardando = false
+                }
+            },
+        ) {
+            Text(if (guardando) "Publicando..." else "Publicar actualización")
+        }
+
+        TextButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
     }
 }
 

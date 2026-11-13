@@ -274,7 +274,17 @@ object Acciones {
     const val EQUIPO_ELIMINADO = "EQUIPO_ELIMINADO"
     const val PIN_CAMBIADO = "PIN_CAMBIADO"
     const val SHEETS_SINCRONIZADO = "SHEETS_SINCRONIZADO"
+    const val ACTUALIZACION_PUBLICADA = "ACTUALIZACION_PUBLICADA"
 }
+
+/** Configuración de la última versión de la aplicación publicada en Firebase. */
+data class InfoActualizacion(
+    val versionCode: Int = 1,
+    val versionName: String = "1.0",
+    val urlDescarga: String = "",
+    val obligatoria: Boolean = false,
+    val novedades: String = "",
+)
 
 /** Una versión publicada de los términos y condiciones. Cada cambio es una versión nueva (1, 2, 3...). */
 data class Terminos(

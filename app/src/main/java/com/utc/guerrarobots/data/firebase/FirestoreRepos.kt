@@ -283,3 +283,33 @@ class FotoFirestore(db: FirebaseFirestore) : FotoRepository {
         col.document(equipoId.toString()).delete().await()
     }
 }
+
+/** Configuración de la última versión publicada de la app en Firestore. */
+class ActualizacionFirestore(db: FirebaseFirestore) : ActualizacionRepository {
+    private val doc = db.collection("gr_configuracion").document("actualizacion")
+
+    override suspend fun obtenerConfiguracion(): InfoActualizacion? {
+        val snapshot = doc.get().await()
+        if (!snapshot.exists()) return null
+        val data = snapshot.data ?: return null
+        return InfoActualizacion(
+            versionCode = (data["versionCode"] as? Long)?.toInt() ?: 1,
+            versionName = data["versionName"] as? String ?: "1.0",
+            urlDescarga = data["urlDescarga"] as? String ?: "",
+            obligatoria = data["obligatoria"] as? Boolean ?: false,
+            novedades = data["novedades"] as? String ?: "",
+        )
+    }
+
+    override suspend fun guardarConfiguracion(info: InfoActualizacion) {
+        doc.set(
+            mapOf(
+                "versionCode" to info.versionCode,
+                "versionName" to info.versionName,
+                "urlDescarga" to info.urlDescarga,
+                "obligatoria" to info.obligatoria,
+                "novedades" to info.novedades,
+            ),
+        ).await()
+    }
+}
