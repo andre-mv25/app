@@ -160,6 +160,7 @@ fun AccesoScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Opcion("Super Admin", rol == Rol.SUPER_ADMIN) { rol = Rol.SUPER_ADMIN; error = null }
             Opcion("Admin", rol == Rol.ADMIN) { rol = Rol.ADMIN; error = null }
             Opcion("Jurado", rol == Rol.JURADO) { rol = Rol.JURADO; error = null }
         }
@@ -186,7 +187,7 @@ fun AccesoScreen(
                 if (pin.isBlank()) {
                     error = "Ingresa tu PIN"
                 } else if (acceso.entrar(correo = "", rol = rol, pin = pin)) {
-                    onEntro(rol)
+                    onEntro(acceso.rolActual)
                 } else {
                     error = "PIN incorrecto o no autorizado"
                 }
@@ -218,12 +219,13 @@ fun PanelScreen(
 ) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val titulo = when {
+            rol == Rol.SUPER_ADMIN -> if (!adminNombre.isNullOrBlank()) "Panel del Super Admin ($adminNombre)" else "Panel del Super Admin"
             rol == Rol.ADMIN -> if (!adminNombre.isNullOrBlank()) "Panel del admin ($adminNombre)" else "Panel del admin"
             rol == Rol.JURADO -> if (!adminNombre.isNullOrBlank()) "Panel del jurado ($adminNombre)" else "Panel del jurado"
             else -> "Panel"
         }
         Text(titulo, style = MaterialTheme.typography.headlineSmall)
-        if (rol == Rol.ADMIN) {
+        if (rol == Rol.ADMIN || rol == Rol.SUPER_ADMIN) {
             Button(onClick = onEquipos, modifier = Modifier.fillMaxWidth()) { Text("Equipos registrados") }
             OutlinedButton(onClick = onPinJurado, modifier = Modifier.fillMaxWidth()) { Text("PIN de acceso") }
             OutlinedButton(onClick = onAuditoria, modifier = Modifier.fillMaxWidth()) { Text("Bitácora de cambios") }

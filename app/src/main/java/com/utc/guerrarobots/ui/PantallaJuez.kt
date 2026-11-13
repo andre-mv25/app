@@ -85,16 +85,28 @@ fun PantallaJuez(
     var ganadores by remember { mutableStateOf<Map<ClaveCategoria, String>>(emptyMap()) }
 
     LaunchedEffect(Unit) {
-        categorias = registro.categorias()
-        equipos = registro.listar(EstadoEquipo.ACEPTADO)
-        val mapa = mutableMapOf<ClaveCategoria, String>()
-        for (categoria in categorias) {
-            val ganador = obtenerGanadorCategoria(categoria, equipos, llaves, tiempos)
-            if (ganador != null) {
-                mapa[categoria.clave] = ganador
+        try {
+            categorias = registro.categorias()
+            equipos = registro.listar(EstadoEquipo.ACEPTADO)
+            val mapa = mutableMapOf<ClaveCategoria, String>()
+            for (categoria in categorias) {
+                val ganador = runCatching { obtenerGanadorCategoria(categoria, equipos, llaves, tiempos) }.getOrNull()
+                if (ganador != null) {
+                    mapa[categoria.clave] = ganador
+                }
             }
+            ganadores = mapa.toMap()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            mensaje = "No se pudieron cargar algunos datos: ${e.message}"
+            esError = true
         }
-        ganadores = mapa.toMap()
+    }
+
+    val fechaFormateada = remember {
+        val sdf = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.getDefault())
+        sdf.format(java.util.Date())
     }
 
     Column(
@@ -122,7 +134,7 @@ fun PantallaJuez(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "Última actualización: ${java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").format(java.time.Instant.now())}",
+                "Última actualización: $fechaFormateada",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
